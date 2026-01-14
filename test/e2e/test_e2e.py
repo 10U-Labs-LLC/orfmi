@@ -185,3 +185,13 @@ class TestModuleExecution:
         )
         assert result.returncode == 0
         assert "Open Rainforest Machine Image" in result.stdout
+
+    def test_module_shows_options(self) -> None:
+        """Test that module help shows expected options."""
+        result = subprocess.run(
+            [sys.executable, "-m", "orfmi", "--help"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert "--config-file" in result.stdout

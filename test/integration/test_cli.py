@@ -88,6 +88,20 @@ class TestCliOutput:
             captured = capsys.readouterr()
             assert "AMI_ID=ami-output123" in captured.out
 
+    def test_outputs_ami_id_format(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Test that AMI ID output is in correct format."""
+        config_file, setup_file = create_test_files(tmp_path)
+        with patch("orfmi.cli.AmiBuilder") as mock_builder:
+            mock_builder.return_value.build.return_value = "ami-xyz789"
+            run_main_with_args([
+                "--config-file", str(config_file),
+                "--setup-file", str(setup_file),
+            ])
+            captured = capsys.readouterr()
+            assert captured.out.strip().startswith("AMI_ID=")
+
 
 @pytest.mark.integration
 class TestCliConfigParsing:
@@ -134,6 +148,17 @@ tags:
             assert config.instance.instance_types == ["t3.micro", "t3.small"]
             assert config.ssh.username == "ubuntu"
 
+    def test_parses_minimal_config(self, tmp_path: Path) -> None:
+        """Test that minimal config is parsed correctly."""
+        config_file, setup_file = create_test_files(tmp_path)
+        with patch("orfmi.cli.AmiBuilder") as mock_builder:
+            mock_builder.return_value.build.return_value = "ami-12345"
+            exit_code = run_main_with_args([
+                "--config-file", str(config_file),
+                "--setup-file", str(setup_file),
+            ])
+            assert exit_code == EXIT_SUCCESS
+
 
 @pytest.mark.integration
 class TestCliExtraFiles:
@@ -158,3 +183,16 @@ class TestCliExtraFiles:
             call_args = mock_builder.call_args
             extra_files = call_args[0][2]
             assert len(extra_files) == 2
+
+    def test_no_extra_files_by_default(self, tmp_path: Path) -> None:
+        """Test that no extra files are passed by default."""
+        config_file, setup_file = create_test_files(tmp_path)
+        with patch("orfmi.cli.AmiBuilder") as mock_builder:
+            mock_builder.return_value.build.return_value = "ami-12345"
+            run_main_with_args([
+                "--config-file", str(config_file),
+                "--setup-file", str(setup_file),
+            ])
+            call_args = mock_builder.call_args
+            extra_files = call_args[0][2]
+            assert not extra_files

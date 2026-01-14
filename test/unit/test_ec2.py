@@ -39,7 +39,13 @@ class TestGetVpcFromSubnet:
         }
         result = get_vpc_from_subnet(ec2, "subnet-12345")
         assert result == "vpc-12345"
-        ec2.describe_subnets.assert_called_once_with(SubnetIds=["subnet-12345"])
+
+    def test_calls_describe_subnets(self) -> None:
+        """Test that describe_subnets is called correctly."""
+        ec2 = MagicMock()
+        ec2.describe_subnets.return_value = {"Subnets": [{"VpcId": "vpc-abc"}]}
+        get_vpc_from_subnet(ec2, "subnet-xyz")
+        ec2.describe_subnets.assert_called_once_with(SubnetIds=["subnet-xyz"])
 
 
 @pytest.mark.unit
@@ -299,6 +305,15 @@ class TestGetInstancePublicIp:
         result = get_instance_public_ip(ec2, "i-12345")
         assert result == "1.2.3.4"
 
+    def test_calls_describe_instances(self) -> None:
+        """Test that describe_instances is called correctly."""
+        ec2 = MagicMock()
+        ec2.describe_instances.return_value = {
+            "Reservations": [{"Instances": [{"PublicIpAddress": "5.6.7.8"}]}]
+        }
+        get_instance_public_ip(ec2, "i-abc123")
+        ec2.describe_instances.assert_called_once_with(InstanceIds=["i-abc123"])
+
 
 @pytest.mark.unit
 class TestCreateAmi:
@@ -345,6 +360,13 @@ class TestTerminateInstance:
         ec2.get_waiter.return_value = waiter
         terminate_instance(ec2, "i-12345")
         ec2.terminate_instances.assert_called_once_with(InstanceIds=["i-12345"])
+
+    def test_waits_for_termination(self) -> None:
+        """Test that waiter is used for termination."""
+        ec2 = MagicMock()
+        waiter = MagicMock()
+        ec2.get_waiter.return_value = waiter
+        terminate_instance(ec2, "i-abc")
         waiter.wait.assert_called_once()
 
 
@@ -357,5 +379,8 @@ class TestGenerateUniqueId:
         id1 = generate_unique_id()
         id2 = generate_unique_id()
         assert id1 != id2
-        assert len(id1) == 8
-        assert len(id2) == 8
+
+    def test_id_length(self) -> None:
+        """Test that IDs have correct length."""
+        unique_id = generate_unique_id()
+        assert len(unique_id) == 8

@@ -67,7 +67,7 @@ class TestConnectSsh:
     @patch("time.sleep")
     def test_retries_on_failure(
         self,
-        mock_sleep: MagicMock,
+        _mock_sleep: MagicMock,
         mock_client_class: MagicMock,
         mock_key_class: MagicMock,
     ) -> None:
@@ -93,7 +93,7 @@ class TestConnectSsh:
     @patch("time.sleep")
     def test_raises_after_max_retries(
         self,
-        mock_sleep: MagicMock,
+        _mock_sleep: MagicMock,
         mock_client_class: MagicMock,
         mock_key_class: MagicMock,
     ) -> None:
@@ -125,6 +125,14 @@ class TestUploadFile:
         local_file.write_text("test content")
         upload_file(sftp, local_file, "/tmp/test.txt")
         sftp.put.assert_called_once_with(str(local_file), "/tmp/test.txt")
+
+    def test_uploads_file_calls_put(self, tmp_path: Path) -> None:
+        """Test that upload_file calls sftp.put."""
+        sftp = MagicMock()
+        local_file = tmp_path / "file.txt"
+        local_file.write_text("content")
+        upload_file(sftp, local_file, "/remote/file.txt")
+        assert sftp.put.called
 
 
 @pytest.mark.unit
@@ -160,7 +168,7 @@ class TestRunSetupScript:
     @patch("orfmi.ssh.connect_ssh")
     @patch("orfmi.ssh.run_ssh_command")
     def test_uploads_extra_files(
-        self, mock_run_cmd: MagicMock, mock_connect: MagicMock, tmp_path: Path
+        self, _mock_run_cmd: MagicMock, mock_connect: MagicMock, tmp_path: Path
     ) -> None:
         """Test uploading extra files."""
         mock_client = MagicMock()
