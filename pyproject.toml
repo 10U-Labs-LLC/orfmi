@@ -1,0 +1,43 @@
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = ["setuptools>=61.0", "setuptools-scm>=8.0"]
+
+[project]
+authors = [{name = "10U Labs", email = "dev@10ulabs.com"}]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: System :: Systems Administration",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "boto3>=1.34.0",
+    "paramiko>=3.4.0",
+    "pyyaml>=6.0",
+]
+description = "Open Rainforest Machine Image - CLI tool for creating AWS AMIs"
+dynamic = ["version"]
+license = "Apache-2.0"
+name = "ormi"
+readme = "README.md"
+requires-python = ">=3.10"
+
+[project.scripts]
+ormi = "ormi.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/10U-Labs-LLC/ormi"
+Issues = "https://github.com/10U-Labs-LLC/ormi/issues"
+Repository = "https://github.com/10U-Labs-LLC/ormi"
+
+[tool.setuptools_scm]
+
+[tool.setuptools.packages.find]
+where = ["src"]
