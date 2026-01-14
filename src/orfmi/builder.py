@@ -49,6 +49,11 @@ class BuildContext:
     unique_id: str
     extra_files: list[Path] = field(default_factory=list)
 
+    def resource_name(self, suffix: str = "") -> str:
+        """Generate a resource name with optional suffix."""
+        base = f"orfmi-{self.unique_id}"
+        return f"{base}-{suffix}" if suffix else base
+
 
 class AmiBuilder:
     """Builder for creating AWS AMIs."""
@@ -70,6 +75,20 @@ class AmiBuilder:
         self.setup_script = setup_script
         self.extra_files = extra_files or []
 
+    def validate(self) -> bool:
+        """Validate the build configuration.
+
+        Returns:
+            True if configuration is valid for building.
+        """
+        return bool(
+            self.config.ami.name
+            and self.config.region
+            and self.config.source_ami
+            and self.config.instance.subnet_ids
+            and self.config.instance.instance_types
+        )
+
     def build(self) -> str:
         """Build the AMI.
 
@@ -90,34 +109,26 @@ class AmiBuilder:
         )
         state = BuildState()
 
-        key_name = f"orfmi-{unique_id}"
-        template_name = f"orfmi-{unique_id}"
-        sg_name = f"orfmi-{unique_id}"
-
         try:
-            self._run_build(ctx, state, key_name, template_name, sg_name)
+            self._run_build(ctx, state)
         finally:
-            self._cleanup(ctx.ec2, state, template_name, key_name)
+            self._cleanup(ctx, state)
 
         if not state.result:
             raise RuntimeError("AMI build failed: no AMI ID returned")
 
         return state.result
 
-    def _run_build(
-        self,
-        ctx: BuildContext,
-        state: BuildState,
-        key_name: str,
-        template_name: str,
-        sg_name: str,
-    ) -> None:
+    def _run_build(self, ctx: BuildContext, state: BuildState) -> None:
         """Execute the AMI build process."""
         config = ctx.config
         ec2 = ctx.ec2
+        key_name = ctx.resource_name()
+        template_name = ctx.resource_name()
+        sg_name = ctx.resource_name()
 
-        logger.info("Subnets: %s", config.subnet_ids)
-        vpc_id = get_vpc_from_subnet(ec2, config.subnet_ids[0])
+        logger.info("Subnets: %s", config.instance.subnet_ids)
+        vpc_id = get_vpc_from_subnet(ec2, config.instance.subnet_ids[0])
         logger.info("VPC: %s", vpc_id)
 
         logger.info("Creating temporary key pair...")
@@ -138,20 +149,37 @@ class AmiBuilder:
             base_ami=source_ami_id,
             sg_id=state.sg_id,
             key_name=key_name,
-            iam_profile=config.iam_instance_profile,
+            iam_profile=config.instance.iam_instance_profile,
         )
         create_launch_template(ec2, lt_params, config.tags)
 
-        num_types = len(config.instance_types)
-        num_subnets = len(config.subnet_ids)
+        self._launch_and_configure(ctx, state, template_name)
+
+        state.result = create_ami(
+            ec2,
+            state.instance_id,
+            config.ami.name,
+            config.ami.description,
+            config.tags,
+        )
+
+    def _launch_and_configure(
+        self, ctx: BuildContext, state: BuildState, template_name: str
+    ) -> None:
+        """Launch instance and run configuration."""
+        config = ctx.config
+        ec2 = ctx.ec2
+
+        num_types = len(config.instance.instance_types)
+        num_subnets = len(config.instance.subnet_ids)
         logger.info(
             "Creating EC2 Fleet with %d instance types x %d subnets...",
             num_types,
             num_subnets,
         )
         fleet_config = FleetConfig(
-            instance_types=config.instance_types,
-            subnet_ids=config.subnet_ids,
+            instance_types=config.instance.instance_types,
+            subnet_ids=config.instance.subnet_ids,
         )
         state.instance_id = create_fleet_instance(ec2, template_name, fleet_config)
         logger.info("Instance launched: %s", state.instance_id)
@@ -164,28 +192,18 @@ class AmiBuilder:
             ssh_config = SshConfig(
                 ip_address=public_ip,
                 key_material=state.key_material,
-                username=config.ssh_username,
-                timeout=config.ssh_timeout,
-                retries=config.ssh_retries,
+                username=config.ssh.username,
+                timeout=config.ssh.timeout,
+                retries=config.ssh.retries,
             )
             run_setup_script(ssh_config, ctx.setup_script, ctx.extra_files)
 
-        state.result = create_ami(
-            ec2,
-            state.instance_id,
-            config.ami_name,
-            config.ami_description,
-            config.tags,
-        )
-
-    def _cleanup(
-        self,
-        ec2: Any,
-        state: BuildState,
-        template_name: str,
-        key_name: str,
-    ) -> None:
+    def _cleanup(self, ctx: BuildContext, state: BuildState) -> None:
         """Clean up temporary resources created during the build."""
+        ec2 = ctx.ec2
+        key_name = ctx.resource_name()
+        template_name = ctx.resource_name()
+
         if state.instance_id:
             logger.info("Terminating temporary instance...")
             terminate_instance(ec2, state.instance_id)

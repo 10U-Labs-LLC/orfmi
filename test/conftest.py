@@ -1,7 +1,8 @@
 """Pytest configuration and shared fixtures."""
 
 from pathlib import Path
-from unittest.mock import patch
+from typing import Any, Generator
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -43,3 +44,39 @@ def create_test_files(tmp_path: Path) -> tuple[Path, Path]:
     setup_file = tmp_path / "setup.sh"
     setup_file.write_text("#!/bin/bash\necho 'Hello'")
     return config_file, setup_file
+
+
+@pytest.fixture
+def builder_mocks() -> Generator[dict[str, Any], None, None]:
+    """Create all mocks needed for builder tests."""
+    patches = {
+        "ec2_client": patch("orfmi.builder.create_ec2_client"),
+        "unique_id": patch("orfmi.builder.generate_unique_id"),
+        "get_vpc": patch("orfmi.builder.get_vpc_from_subnet"),
+        "create_key": patch("orfmi.builder.create_key_pair"),
+        "create_sg": patch("orfmi.builder.create_security_group"),
+        "lookup": patch("orfmi.builder.lookup_source_ami"),
+        "create_template": patch("orfmi.builder.create_launch_template"),
+        "create_fleet": patch("orfmi.builder.create_fleet_instance"),
+        "wait": patch("orfmi.builder.wait_for_instance"),
+        "run_script": patch("orfmi.builder.run_setup_script"),
+        "create_ami": patch("orfmi.builder.create_ami"),
+        "terminate": patch("orfmi.builder.terminate_instance"),
+        "delete_template": patch("orfmi.builder.delete_launch_template"),
+        "delete_key": patch("orfmi.builder.delete_key_pair"),
+        "delete_sg": patch("orfmi.builder.delete_security_group"),
+    }
+    mocks = {name: p.start() for name, p in patches.items()}
+    mock_ec2 = MagicMock()
+    mocks["ec2_client"].return_value = mock_ec2
+    mocks["unique_id"].return_value = "abc12345"
+    mocks["get_vpc"].return_value = "vpc-12345"
+    mocks["create_key"].return_value = "private-key"
+    mocks["create_sg"].return_value = "sg-12345"
+    mocks["lookup"].return_value = "ami-source"
+    mocks["create_fleet"].return_value = "i-12345"
+    mocks["wait"].return_value = "1.2.3.4"
+    mocks["create_ami"].return_value = "ami-result"
+    yield mocks
+    for p in patches.values():
+        p.stop()

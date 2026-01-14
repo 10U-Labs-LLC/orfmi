@@ -4,7 +4,14 @@ from pathlib import Path
 
 import pytest
 
-from orfmi.config import AmiConfig, ConfigError, load_config
+from orfmi.config import (
+    AmiConfig,
+    AmiIdentity,
+    ConfigError,
+    InstanceSettings,
+    SSHSettings,
+    load_config,
+)
 
 
 @pytest.mark.unit
@@ -13,61 +20,65 @@ class TestAmiConfig:
 
     def test_default_values(self) -> None:
         """Test that default values are applied correctly."""
+        ami = AmiIdentity(name="test-ami")
+        instance = InstanceSettings(subnet_ids=["subnet-1"], instance_types=["t3.micro"])
         config = AmiConfig(
-            ami_name="test-ami",
+            ami=ami,
             region="us-east-1",
             source_ami="ami-12345",
-            subnet_ids=["subnet-1"],
-            instance_types=["t3.micro"],
+            instance=instance,
         )
-        assert config.ami_description == ""
-        assert config.iam_instance_profile is None
+        assert config.ami.description == ""
+        assert config.instance.iam_instance_profile is None
         assert not config.tags
-        assert config.ssh_username == "admin"
-        assert config.ssh_timeout == 300
-        assert config.ssh_retries == 30
+        assert config.ssh.username == "admin"
+        assert config.ssh.timeout == 300
+        assert config.ssh.retries == 30
         assert config.platform == "linux"
 
     def test_all_fields(self) -> None:
         """Test that all fields are set correctly."""
-        config = AmiConfig(
-            ami_name="test-ami",
-            region="us-west-2",
-            source_ami="ami-67890",
+        ami = AmiIdentity(name="test-ami", description="Test AMI")
+        ssh_settings = SSHSettings(username="ec2-user", timeout=600, retries=60)
+        instance = InstanceSettings(
             subnet_ids=["subnet-1", "subnet-2"],
             instance_types=["t3.micro", "t3.small"],
-            ami_description="Test AMI",
             iam_instance_profile="my-profile",
+        )
+        config = AmiConfig(
+            ami=ami,
+            region="us-west-2",
+            source_ami="ami-67890",
+            instance=instance,
             tags={"Name": "test"},
-            ssh_username="ec2-user",
-            ssh_timeout=600,
-            ssh_retries=60,
+            ssh=ssh_settings,
             platform="windows",
         )
-        assert config.ami_name == "test-ami"
+        assert config.ami.name == "test-ami"
         assert config.region == "us-west-2"
         assert config.source_ami == "ami-67890"
-        assert config.subnet_ids == ["subnet-1", "subnet-2"]
-        assert config.instance_types == ["t3.micro", "t3.small"]
-        assert config.ami_description == "Test AMI"
-        assert config.iam_instance_profile == "my-profile"
+        assert config.instance.subnet_ids == ["subnet-1", "subnet-2"]
+        assert config.instance.instance_types == ["t3.micro", "t3.small"]
+        assert config.ami.description == "Test AMI"
+        assert config.instance.iam_instance_profile == "my-profile"
         assert config.tags == {"Name": "test"}
-        assert config.ssh_username == "ec2-user"
-        assert config.ssh_timeout == 600
-        assert config.ssh_retries == 60
+        assert config.ssh.username == "ec2-user"
+        assert config.ssh.timeout == 600
+        assert config.ssh.retries == 60
         assert config.platform == "windows"
 
     def test_frozen(self) -> None:
         """Test that config is immutable."""
+        ami = AmiIdentity(name="test-ami")
+        instance = InstanceSettings(subnet_ids=["subnet-1"], instance_types=["t3.micro"])
         config = AmiConfig(
-            ami_name="test-ami",
+            ami=ami,
             region="us-east-1",
             source_ami="ami-12345",
-            subnet_ids=["subnet-1"],
-            instance_types=["t3.micro"],
+            instance=instance,
         )
         with pytest.raises(AttributeError):
-            setattr(config, "ami_name", "new-name")
+            setattr(config, "region", "us-west-2")
 
 
 @pytest.mark.unit
@@ -87,11 +98,11 @@ instance_types:
   - t3.micro
 """)
         config = load_config(config_file)
-        assert config.ami_name == "test-ami"
+        assert config.ami.name == "test-ami"
         assert config.region == "us-east-1"
         assert config.source_ami == "debian-12-*"
-        assert config.subnet_ids == ["subnet-12345"]
-        assert config.instance_types == ["t3.micro"]
+        assert config.instance.subnet_ids == ["subnet-12345"]
+        assert config.instance.instance_types == ["t3.micro"]
 
     def test_valid_full_config(self, tmp_path: Path) -> None:
         """Test loading a full configuration."""
@@ -117,12 +128,12 @@ tags:
   Environment: dev
 """)
         config = load_config(config_file)
-        assert config.ami_name == "my-ami"
-        assert config.ami_description == "My custom AMI"
-        assert config.iam_instance_profile == "my-profile"
-        assert config.ssh_username == "ubuntu"
-        assert config.ssh_timeout == 600
-        assert config.ssh_retries == 60
+        assert config.ami.name == "my-ami"
+        assert config.ami.description == "My custom AMI"
+        assert config.instance.iam_instance_profile == "my-profile"
+        assert config.ssh.username == "ubuntu"
+        assert config.ssh.timeout == 600
+        assert config.ssh.retries == 60
         assert config.platform == "linux"
         assert config.tags == {"Name": "test", "Environment": "dev"}
 

@@ -1,12 +1,12 @@
 """Integration tests for CLI module."""
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from test.conftest import create_test_files, run_main_with_args
+from unittest.mock import patch
 
 import pytest
 
 from orfmi.cli import EXIT_ERROR, EXIT_FAILURE, EXIT_SUCCESS
-from test.conftest import VALID_CONFIG_YAML, create_test_files, run_main_with_args
 
 
 @pytest.mark.integration
@@ -128,11 +128,11 @@ tags:
             assert exit_code == EXIT_SUCCESS
             call_args = mock_builder.call_args
             config = call_args[0][0]
-            assert config.ami_name == "my-custom-ami"
+            assert config.ami.name == "my-custom-ami"
             assert config.region == "us-west-2"
-            assert config.subnet_ids == ["subnet-aaa", "subnet-bbb"]
-            assert config.instance_types == ["t3.micro", "t3.small"]
-            assert config.ssh_username == "ubuntu"
+            assert config.instance.subnet_ids == ["subnet-aaa", "subnet-bbb"]
+            assert config.instance.instance_types == ["t3.micro", "t3.small"]
+            assert config.ssh.username == "ubuntu"
 
 
 @pytest.mark.integration

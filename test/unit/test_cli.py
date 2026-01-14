@@ -2,6 +2,7 @@
 
 import logging
 from pathlib import Path
+from test.conftest import create_test_files, run_main_with_args
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -14,7 +15,6 @@ from orfmi.cli import (
     setup_logging,
     validate_files,
 )
-from test.conftest import create_test_files, run_main_with_args
 
 
 @pytest.mark.unit

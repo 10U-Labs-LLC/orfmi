@@ -8,20 +8,41 @@ import yaml
 
 
 @dataclass(frozen=True)
+class SSHSettings:
+    """SSH connection settings."""
+
+    username: str = "admin"
+    timeout: int = 300
+    retries: int = 30
+
+
+@dataclass(frozen=True)
+class InstanceSettings:
+    """Instance launch settings."""
+
+    subnet_ids: list[str]
+    instance_types: list[str]
+    iam_instance_profile: str | None = None
+
+
+@dataclass(frozen=True)
+class AmiIdentity:
+    """AMI identification settings."""
+
+    name: str
+    description: str = ""
+
+
+@dataclass(frozen=True)
 class AmiConfig:
     """Configuration for AMI creation."""
 
-    ami_name: str
+    ami: AmiIdentity
     region: str
     source_ami: str
-    subnet_ids: list[str]
-    instance_types: list[str]
-    ami_description: str = ""
-    iam_instance_profile: str | None = None
+    instance: InstanceSettings
     tags: dict[str, str] = field(default_factory=dict)
-    ssh_username: str = "admin"
-    ssh_timeout: int = 300
-    ssh_retries: int = 30
+    ssh: SSHSettings = field(default_factory=SSHSettings)
     platform: str = "linux"
 
 
@@ -89,17 +110,26 @@ def load_config(config_path: Path) -> AmiConfig:
     _validate_list_fields(data)
     _validate_platform(data)
 
-    return AmiConfig(
-        ami_name=str(data["ami_name"]),
-        region=str(data["region"]),
-        source_ami=str(data["source_ami"]),
+    ssh_settings = SSHSettings(
+        username=str(data.get("ssh_username", "admin")),
+        timeout=int(data.get("ssh_timeout", 300)),
+        retries=int(data.get("ssh_retries", 30)),
+    )
+    instance_settings = InstanceSettings(
         subnet_ids=[str(s) for s in data["subnet_ids"]],
         instance_types=[str(t) for t in data["instance_types"]],
-        ami_description=str(data.get("ami_description", "")),
         iam_instance_profile=data.get("iam_instance_profile"),
+    )
+    ami_identity = AmiIdentity(
+        name=str(data["ami_name"]),
+        description=str(data.get("ami_description", "")),
+    )
+    return AmiConfig(
+        ami=ami_identity,
+        region=str(data["region"]),
+        source_ami=str(data["source_ami"]),
+        instance=instance_settings,
         tags=_parse_tags(data),
-        ssh_username=str(data.get("ssh_username", "admin")),
-        ssh_timeout=int(data.get("ssh_timeout", 300)),
-        ssh_retries=int(data.get("ssh_retries", 30)),
+        ssh=ssh_settings,
         platform=str(data.get("platform", "linux")),
     )
