@@ -114,6 +114,3 @@ def main() -> None:
     except RuntimeError as e:
         logging.error("Build failed: %s", e)
         sys.exit(EXIT_FAILURE)
-    except Exception as e:
-        logging.error("Unexpected error: %s", e)
-        sys.exit(EXIT_ERROR)

@@ -5,8 +5,6 @@ from unittest.mock import patch
 
 import pytest
 
-import orfmi.__main__
-
 
 @pytest.mark.unit
 class TestMainModule:
@@ -15,5 +13,8 @@ class TestMainModule:
     def test_main_is_called(self) -> None:
         """Test that main() is called when module is executed."""
         with patch("orfmi.cli.main") as mock_main:
-            importlib.reload(orfmi.__main__)
+            # Import must happen inside the test with patch active
+            # because __main__.py calls main() on import
+            module = importlib.import_module("orfmi.__main__")
+            importlib.reload(module)
             mock_main.assert_called_once()

@@ -22,7 +22,7 @@ class TestAmiConfig:
         )
         assert config.ami_description == ""
         assert config.iam_instance_profile is None
-        assert config.tags == {}
+        assert not config.tags
         assert config.ssh_username == "admin"
         assert config.ssh_timeout == 300
         assert config.ssh_retries == 30
@@ -67,7 +67,7 @@ class TestAmiConfig:
             instance_types=["t3.micro"],
         )
         with pytest.raises(AttributeError):
-            config.ami_name = "new-name"
+            setattr(config, "ami_name", "new-name")
 
 
 @pytest.mark.unit
