@@ -69,11 +69,12 @@ def connect_ssh(config: SshConfig) -> paramiko.SSHClient:
             paramiko.ssh_exception.NoValidConnectionsError,
             TimeoutError,
             OSError,
-        ):
+        ) as exc:
             if attempt == config.retries - 1:
                 raise RuntimeError(
-                    f"Failed to connect to {config.ip_address} after {config.retries} attempts"
-                )
+                    f"Failed to connect to {config.ip_address} "
+                    f"after {config.retries} attempts"
+                ) from exc
             time.sleep(10)
 
     raise RuntimeError(f"Failed to connect to {config.ip_address}")

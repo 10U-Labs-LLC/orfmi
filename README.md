@@ -1,6 +1,7 @@
 # ORFMI - Open Rainforest Machine Image
 
-A Python CLI tool for creating AWS AMIs from configuration files and setup scripts.
+A Python CLI tool for creating AWS AMIs from configuration files and
+setup scripts.
 
 ## Installation
 
@@ -17,11 +18,11 @@ orfmi --config-file config.yml --setup-file setup.sh
 ### Required Arguments
 
 - `--config-file FILE` - Path to the YAML configuration file
-- `--setup-file FILE` - Path to the setup script (bash for Linux, PowerShell for Windows)
+- `--setup-file FILE` - Path to the setup script (bash or PowerShell)
 
 ### Optional Arguments
 
-- `--extra-files FILE [FILE ...]` - Additional files to upload to the instance
+- `--extra-files FILE [FILE ...]` - Additional files to upload
 - `-v, --verbose` - Enable verbose output
 - `-q, --quiet` - Suppress output except for errors and the final AMI ID
 
@@ -55,29 +56,30 @@ tags:
 
 ### Required Fields
 
-| Field | Description |
-|-------|-------------|
-| `ami_name` | Name for the created AMI |
-| `region` | AWS region |
-| `source_ami` | Source AMI name pattern (supports wildcards) |
-| `subnet_ids` | List of subnet IDs for launching the instance |
-| `instance_types` | List of instance types to try (uses EC2 Fleet) |
+| Field           | Description                                       |
+| --------------- | ------------------------------------------------- |
+| `ami_name`      | Name for the created AMI                          |
+| `region`        | AWS region                                        |
+| `source_ami`    | Source AMI name pattern (supports wildcards)      |
+| `subnet_ids`    | List of subnet IDs for launching the instance     |
+| `instance_types`| List of instance types to try (uses EC2 Fleet)    |
 
 ### Optional Fields
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `ami_description` | `""` | Description for the AMI |
-| `iam_instance_profile` | `null` | IAM instance profile name |
-| `ssh_username` | `admin` | SSH username for connecting |
-| `ssh_timeout` | `300` | SSH command timeout in seconds |
-| `ssh_retries` | `30` | Number of SSH connection retries |
-| `platform` | `linux` | Platform type (`linux` or `windows`) |
-| `tags` | `{}` | Tags to apply to resources |
+| Field                  | Default   | Description                        |
+| ---------------------- | --------- | ---------------------------------- |
+| `ami_description`      | `""`      | Description for the AMI            |
+| `iam_instance_profile` | `null`    | IAM instance profile name          |
+| `ssh_username`         | `admin`   | SSH username for connecting        |
+| `ssh_timeout`          | `300`     | SSH command timeout in seconds     |
+| `ssh_retries`          | `30`      | Number of SSH connection retries   |
+| `platform`             | `linux`   | Platform type (`linux`/`windows`)  |
+| `tags`                 | `{}`      | Tags to apply to resources         |
 
 ## Setup Script
 
-The setup script is executed on the instance to configure it before creating the AMI.
+The setup script runs on the instance to configure it before creating
+the AMI.
 
 ### Linux (Bash)
 
@@ -105,8 +107,8 @@ rm -rf /var/lib/apt/lists/*
 ```powershell
 # Install Chocolatey
 Set-ExecutionPolicy Bypass -Scope Process -Force
-[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+$url = 'https://chocolatey.org/install.ps1'
+iex ((New-Object System.Net.WebClient).DownloadString($url))
 
 # Install software
 choco install -y git docker-desktop
@@ -114,17 +116,17 @@ choco install -y git docker-desktop
 
 ## Exit Codes
 
-| Code | Description |
-|------|-------------|
-| 0 | Success - AMI created |
-| 1 | Build failure |
-| 2 | Configuration or usage error |
+| Code | Description                   |
+| ---- | ----------------------------- |
+| 0    | Success - AMI created         |
+| 1    | Build failure                 |
+| 2    | Configuration or usage error  |
 
 ## Output
 
 On success, the tool outputs the AMI ID in the format:
 
-```
+```text
 AMI_ID=ami-0123456789abcdef0
 ```
 

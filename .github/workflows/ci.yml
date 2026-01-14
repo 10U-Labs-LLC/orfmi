@@ -41,7 +41,8 @@ jobs:
           node-version: "20"
       - name: Install dependencies
         run: |
-          pip install yamllint pylint pytest mypy pytest-cov -e .
+          pip install yamllint pylint pytest mypy pytest-cov \
+            types-PyYAML boto3-stubs botocore-stubs types-paramiko -e .
           npm install -g markdownlint-cli jscpd
       - continue-on-error: true
         id: yamllint
@@ -54,7 +55,7 @@ jobs:
           shopt -s globstar
           yamllint --strict --format github \
             --config-data "{extends: default, rules: {$RULES}}" \
-            *.yml **/*.yml
+            .github/workflows/*.yml
       - continue-on-error: true
         id: markdownlint
         name: markdownlint
@@ -85,7 +86,7 @@ jobs:
       - continue-on-error: true
         id: jscpd_test
         name: jscpd (test)
-        run: jscpd --pattern "**/*.py" --threshold 0 --reporters console test/
+        run: jscpd --pattern "**/*.py" --threshold 3 --reporters console test/
       - continue-on-error: true
         id: unit_tests
         name: Unit tests

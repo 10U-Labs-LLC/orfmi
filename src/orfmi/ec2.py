@@ -252,7 +252,7 @@ def create_ami(
     response = ec2.create_image(
         InstanceId=instance_id, Name=ami_name, Description=ami_description or ""
     )
-    ami_id = response["ImageId"]
+    ami_id: str = response["ImageId"]
     logger.info("Creating AMI %s...", ami_id)
     waiter = ec2.get_waiter("image_available")
     waiter.wait(ImageIds=[ami_id])

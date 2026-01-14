@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from botocore.exceptions import ClientError
 
 from orfmi.ec2 import (
     FleetConfig,
@@ -108,12 +109,12 @@ class TestDeleteKeyPair:
 
     def test_handles_error(self) -> None:
         """Test that errors are logged but not raised."""
-        from botocore.exceptions import ClientError
         ec2 = MagicMock()
         ec2.delete_key_pair.side_effect = ClientError(
             {"Error": {"Code": "InvalidKeyPair.NotFound"}}, "DeleteKeyPair"
         )
         delete_key_pair(ec2, "test-key")
+        assert ec2.delete_key_pair.call_count == 1
 
 
 @pytest.mark.unit
@@ -152,7 +153,6 @@ class TestDeleteSecurityGroup:
 
     def test_retries_on_failure(self) -> None:
         """Test that deletion is retried on failure."""
-        from botocore.exceptions import ClientError
         ec2 = MagicMock()
         ec2.delete_security_group.side_effect = [
             ClientError({"Error": {"Code": "DependencyViolation"}}, "DeleteSecurityGroup"),
@@ -206,12 +206,12 @@ class TestDeleteLaunchTemplate:
 
     def test_handles_error(self) -> None:
         """Test that errors are silently ignored."""
-        from botocore.exceptions import ClientError
         ec2 = MagicMock()
         ec2.delete_launch_template.side_effect = ClientError(
             {"Error": {"Code": "NotFound"}}, "DeleteLaunchTemplate"
         )
         delete_launch_template(ec2, "test-template")
+        assert ec2.delete_launch_template.call_count == 1
 
 
 @pytest.mark.unit

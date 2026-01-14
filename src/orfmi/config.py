@@ -32,7 +32,7 @@ class ConfigError(Exception):
 def _validate_required_fields(data: dict[str, Any]) -> None:
     """Validate that all required fields are present."""
     required = ["ami_name", "region", "source_ami", "subnet_ids", "instance_types"]
-    missing = [f for f in required if f not in data or not data[f]]
+    missing = [f for f in required if f not in data or data[f] is None]
     if missing:
         raise ConfigError(f"Missing required fields: {', '.join(missing)}")
 

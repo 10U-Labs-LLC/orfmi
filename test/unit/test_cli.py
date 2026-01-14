@@ -14,6 +14,7 @@ from orfmi.cli import (
     setup_logging,
     validate_files,
 )
+from test.conftest import run_main_with_args
 
 
 @pytest.mark.unit
@@ -168,7 +169,6 @@ class TestMain:
 
     def test_missing_config_file(self, tmp_path: Path) -> None:
         """Test exit code when config file is missing."""
-        from test.conftest import run_main_with_args
         setup_file = tmp_path / "setup.sh"
         setup_file.touch()
         exit_code = run_main_with_args([
@@ -179,7 +179,6 @@ class TestMain:
 
     def test_missing_setup_file(self, tmp_path: Path) -> None:
         """Test exit code when setup file is missing."""
-        from test.conftest import run_main_with_args
         config_file = tmp_path / "config.yml"
         config_file.touch()
         exit_code = run_main_with_args([
@@ -190,7 +189,6 @@ class TestMain:
 
     def test_invalid_config(self, tmp_path: Path) -> None:
         """Test exit code when config is invalid."""
-        from test.conftest import run_main_with_args
         config_file = tmp_path / "config.yml"
         setup_file = tmp_path / "setup.sh"
         config_file.write_text("invalid: yaml: syntax:")
@@ -203,7 +201,6 @@ class TestMain:
 
     def test_successful_build(self, tmp_path: Path) -> None:
         """Test successful build returns AMI ID."""
-        from test.conftest import run_main_with_args
         config_file = tmp_path / "config.yml"
         setup_file = tmp_path / "setup.sh"
         config_file.write_text("""
@@ -228,7 +225,6 @@ instance_types:
 
     def test_build_failure(self, tmp_path: Path) -> None:
         """Test build failure returns failure exit code."""
-        from test.conftest import run_main_with_args
         config_file = tmp_path / "config.yml"
         setup_file = tmp_path / "setup.sh"
         config_file.write_text("""
