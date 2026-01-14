@@ -93,3 +93,16 @@ def ssh_command_channel() -> dict[str, Any]:
     stdout.channel = channel
     client.exec_command.return_value = (None, stdout, None)
     return {"client": client, "channel": channel, "stdout": stdout}
+
+
+@pytest.fixture
+def fleet_ec2_mock() -> MagicMock:
+    """Create EC2 mock for fleet instance tests."""
+    ec2 = MagicMock()
+    ec2.describe_launch_templates.return_value = {
+        "LaunchTemplates": [{"LaunchTemplateId": "lt-12345"}]
+    }
+    ec2.create_fleet.return_value = {
+        "Instances": [{"InstanceIds": ["i-12345"]}]
+    }
+    return ec2

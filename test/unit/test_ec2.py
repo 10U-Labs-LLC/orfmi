@@ -569,49 +569,37 @@ class TestCheckInstanceState:
 class TestCreateFleetInstancePurchaseType:
     """Tests for create_fleet_instance with purchase_type."""
 
-    def test_spot_purchase_type_uses_spot_options(self) -> None:
+    def test_spot_purchase_type_uses_spot_options(
+        self, fleet_ec2_mock: MagicMock
+    ) -> None:
         """Test that spot purchase type uses SpotOptions."""
-        ec2 = MagicMock()
-        ec2.describe_launch_templates.return_value = {
-            "LaunchTemplates": [{"LaunchTemplateId": "lt-12345"}]
-        }
-        ec2.create_fleet.return_value = {
-            "Instances": [{"InstanceIds": ["i-12345"]}]
-        }
         config = FleetConfig(
             instance_types=["t3.micro"],
             subnet_ids=["subnet-12345"],
             purchase_type="spot",
         )
-        create_fleet_instance(ec2, "test-template", config)
-        call_kwargs = ec2.create_fleet.call_args.kwargs
+        create_fleet_instance(fleet_ec2_mock, "test-template", config)
+        call_kwargs = fleet_ec2_mock.create_fleet.call_args.kwargs
         assert "SpotOptions" in call_kwargs
 
-    def test_on_demand_purchase_type_uses_on_demand_options(self) -> None:
+    def test_on_demand_purchase_type_uses_on_demand_options(
+        self, fleet_ec2_mock: MagicMock
+    ) -> None:
         """Test that on-demand purchase type uses OnDemandOptions."""
-        ec2 = MagicMock()
-        ec2.describe_launch_templates.return_value = {
-            "LaunchTemplates": [{"LaunchTemplateId": "lt-12345"}]
-        }
-        ec2.create_fleet.return_value = {
-            "Instances": [{"InstanceIds": ["i-12345"]}]
-        }
         config = FleetConfig(
             instance_types=["t3.micro"],
             subnet_ids=["subnet-12345"],
             purchase_type="on-demand",
         )
-        create_fleet_instance(ec2, "test-template", config)
-        call_kwargs = ec2.create_fleet.call_args.kwargs
+        create_fleet_instance(fleet_ec2_mock, "test-template", config)
+        call_kwargs = fleet_ec2_mock.create_fleet.call_args.kwargs
         assert "OnDemandOptions" in call_kwargs
 
-    def test_raises_capacity_error_on_capacity_failure(self) -> None:
+    def test_raises_capacity_error_on_capacity_failure(
+        self, fleet_ec2_mock: MagicMock
+    ) -> None:
         """Test that CapacityError is raised for capacity failures."""
-        ec2 = MagicMock()
-        ec2.describe_launch_templates.return_value = {
-            "LaunchTemplates": [{"LaunchTemplateId": "lt-12345"}]
-        }
-        ec2.create_fleet.return_value = {
+        fleet_ec2_mock.create_fleet.return_value = {
             "Instances": [],
             "Errors": [{"ErrorCode": "InsufficientInstanceCapacity"}],
         }
@@ -620,15 +608,13 @@ class TestCreateFleetInstancePurchaseType:
             subnet_ids=["subnet-12345"],
         )
         with pytest.raises(CapacityError, match="Capacity error"):
-            create_fleet_instance(ec2, "test-template", config)
+            create_fleet_instance(fleet_ec2_mock, "test-template", config)
 
-    def test_raises_runtime_error_on_other_failure(self) -> None:
+    def test_raises_runtime_error_on_other_failure(
+        self, fleet_ec2_mock: MagicMock
+    ) -> None:
         """Test that RuntimeError is raised for non-capacity failures."""
-        ec2 = MagicMock()
-        ec2.describe_launch_templates.return_value = {
-            "LaunchTemplates": [{"LaunchTemplateId": "lt-12345"}]
-        }
-        ec2.create_fleet.return_value = {
+        fleet_ec2_mock.create_fleet.return_value = {
             "Instances": [],
             "Errors": [{"ErrorCode": "InvalidParameterValue"}],
         }
@@ -637,23 +623,18 @@ class TestCreateFleetInstancePurchaseType:
             subnet_ids=["subnet-12345"],
         )
         with pytest.raises(RuntimeError, match="Failed to create fleet"):
-            create_fleet_instance(ec2, "test-template", config)
+            create_fleet_instance(fleet_ec2_mock, "test-template", config)
 
-    def test_sets_correct_target_capacity_type(self) -> None:
+    def test_sets_correct_target_capacity_type(
+        self, fleet_ec2_mock: MagicMock
+    ) -> None:
         """Test that DefaultTargetCapacityType is set correctly."""
-        ec2 = MagicMock()
-        ec2.describe_launch_templates.return_value = {
-            "LaunchTemplates": [{"LaunchTemplateId": "lt-12345"}]
-        }
-        ec2.create_fleet.return_value = {
-            "Instances": [{"InstanceIds": ["i-12345"]}]
-        }
         config = FleetConfig(
             instance_types=["t3.micro"],
             subnet_ids=["subnet-12345"],
             purchase_type="spot",
         )
-        create_fleet_instance(ec2, "test-template", config)
-        call_kwargs = ec2.create_fleet.call_args.kwargs
+        create_fleet_instance(fleet_ec2_mock, "test-template", config)
+        call_kwargs = fleet_ec2_mock.create_fleet.call_args.kwargs
         target_spec = call_kwargs["TargetCapacitySpecification"]
         assert target_spec["DefaultTargetCapacityType"] == "spot"
