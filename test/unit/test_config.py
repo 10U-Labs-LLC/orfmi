@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from ormi.config import AmiConfig, ConfigError, load_config
+from orfmi.config import AmiConfig, ConfigError, load_config
 
 
 @pytest.mark.unit

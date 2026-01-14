@@ -1,17 +1,17 @@
-# ORMI - Open Rainforest Machine Image
+# ORFMI - Open Rainforest Machine Image
 
 A Python CLI tool for creating AWS AMIs from configuration files and setup scripts.
 
 ## Installation
 
 ```bash
-pip install ormi
+pip install orfmi
 ```
 
 ## Usage
 
 ```bash
-ormi --config-file config.yml --setup-file setup.sh
+orfmi --config-file config.yml --setup-file setup.sh
 ```
 
 ### Required Arguments

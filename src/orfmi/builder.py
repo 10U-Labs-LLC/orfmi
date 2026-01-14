@@ -90,9 +90,9 @@ class AmiBuilder:
         )
         state = BuildState()
 
-        key_name = f"ormi-{unique_id}"
-        template_name = f"ormi-{unique_id}"
-        sg_name = f"ormi-{unique_id}"
+        key_name = f"orfmi-{unique_id}"
+        template_name = f"orfmi-{unique_id}"
+        sg_name = f"orfmi-{unique_id}"
 
         try:
             self._run_build(ctx, state, key_name, template_name, sg_name)

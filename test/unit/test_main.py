@@ -11,8 +11,8 @@ class TestMainModule:
 
     def test_main_is_called(self) -> None:
         """Test that main() is called when module is executed."""
-        with patch("ormi.cli.main") as mock_main:
+        with patch("orfmi.cli.main") as mock_main:
             import importlib
-            import ormi.__main__
-            importlib.reload(ormi.__main__)
+            import orfmi.__main__
+            importlib.reload(orfmi.__main__)
             mock_main.assert_called_once()

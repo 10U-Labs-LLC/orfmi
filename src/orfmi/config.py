@@ -1,4 +1,4 @@
-"""Configuration file parsing for ORMI."""
+"""Configuration file parsing for ORFMI."""
 
 from dataclasses import dataclass, field
 from pathlib import Path

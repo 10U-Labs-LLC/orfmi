@@ -1,4 +1,4 @@
-"""End-to-end tests for ORMI CLI."""
+"""End-to-end tests for ORFMI CLI."""
 
 import subprocess
 import sys
@@ -8,9 +8,9 @@ import pytest
 
 
 def run_cli(*args: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
-    """Run the ORMI CLI with the given arguments."""
+    """Run the ORFMI CLI with the given arguments."""
     return subprocess.run(
-        [sys.executable, "-m", "ormi", *args],
+        [sys.executable, "-m", "orfmi", *args],
         capture_output=True,
         text=True,
         check=False,
@@ -175,10 +175,10 @@ instance_types: []
 class TestModuleExecution:
     """E2E tests for module execution."""
 
-    def test_python_m_ormi(self) -> None:
-        """Test running via python -m ormi."""
+    def test_python_m_orfmi(self) -> None:
+        """Test running via python -m orfmi."""
         result = subprocess.run(
-            [sys.executable, "-m", "ormi", "--help"],
+            [sys.executable, "-m", "orfmi", "--help"],
             capture_output=True,
             text=True,
             check=False,

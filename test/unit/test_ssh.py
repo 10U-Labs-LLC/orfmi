@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ormi.ssh import SshConfig, connect_ssh, run_setup_script, upload_file
+from orfmi.ssh import SshConfig, connect_ssh, run_setup_script, upload_file
 
 
 @pytest.mark.unit
@@ -42,8 +42,8 @@ class TestSshConfig:
 class TestConnectSsh:
     """Tests for connect_ssh function."""
 
-    @patch("ormi.ssh.paramiko.Ed25519Key.from_private_key")
-    @patch("ormi.ssh.paramiko.SSHClient")
+    @patch("orfmi.ssh.paramiko.Ed25519Key.from_private_key")
+    @patch("orfmi.ssh.paramiko.SSHClient")
     def test_successful_connection(
         self, mock_client_class: MagicMock, mock_key_class: MagicMock
     ) -> None:
@@ -62,8 +62,8 @@ class TestConnectSsh:
         assert result == mock_client
         mock_client.connect.assert_called_once()
 
-    @patch("ormi.ssh.paramiko.Ed25519Key.from_private_key")
-    @patch("ormi.ssh.paramiko.SSHClient")
+    @patch("orfmi.ssh.paramiko.Ed25519Key.from_private_key")
+    @patch("orfmi.ssh.paramiko.SSHClient")
     @patch("time.sleep")
     def test_retries_on_failure(
         self,
@@ -88,8 +88,8 @@ class TestConnectSsh:
         assert result == mock_client
         assert mock_client.connect.call_count == 2
 
-    @patch("ormi.ssh.paramiko.Ed25519Key.from_private_key")
-    @patch("ormi.ssh.paramiko.SSHClient")
+    @patch("orfmi.ssh.paramiko.Ed25519Key.from_private_key")
+    @patch("orfmi.ssh.paramiko.SSHClient")
     @patch("time.sleep")
     def test_raises_after_max_retries(
         self,
@@ -131,8 +131,8 @@ class TestUploadFile:
 class TestRunSetupScript:
     """Tests for run_setup_script function."""
 
-    @patch("ormi.ssh.connect_ssh")
-    @patch("ormi.ssh.run_ssh_command")
+    @patch("orfmi.ssh.connect_ssh")
+    @patch("orfmi.ssh.run_ssh_command")
     def test_runs_script(
         self, mock_run_cmd: MagicMock, mock_connect: MagicMock, tmp_path: Path
     ) -> None:
@@ -157,8 +157,8 @@ class TestRunSetupScript:
         mock_run_cmd.assert_called_once()
         mock_client.close.assert_called_once()
 
-    @patch("ormi.ssh.connect_ssh")
-    @patch("ormi.ssh.run_ssh_command")
+    @patch("orfmi.ssh.connect_ssh")
+    @patch("orfmi.ssh.run_ssh_command")
     def test_uploads_extra_files(
         self, mock_run_cmd: MagicMock, mock_connect: MagicMock, tmp_path: Path
     ) -> None:

@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from ormi.cli import main
+from orfmi.cli import main
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -16,7 +16,7 @@ def pytest_configure(config: pytest.Config) -> None:
 
 def run_main_with_args(args: list[str]) -> int:
     """Run main() with given args and return exit code."""
-    with patch("sys.argv", ["ormi", *args]):
+    with patch("sys.argv", ["orfmi", *args]):
         try:
             main()
             return 0

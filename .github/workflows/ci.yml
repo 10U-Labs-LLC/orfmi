@@ -92,7 +92,7 @@ jobs:
         run: |
           python3 -m pytest test/unit/ \
             --verbose --pythonwarnings=error \
-            --cov=ormi \
+            --cov=orfmi \
             --cov-fail-under=100
       - continue-on-error: true
         id: integration_tests
@@ -100,7 +100,7 @@ jobs:
         run: |
           python3 -m pytest test/integration/ \
             --verbose --pythonwarnings=error \
-            --cov=ormi \
+            --cov=orfmi \
             --cov-fail-under=100
       - continue-on-error: true
         id: e2e_tests

@@ -1,1 +1,1 @@
-"""Test package for ORMI."""
+"""Test package for ORFMI."""

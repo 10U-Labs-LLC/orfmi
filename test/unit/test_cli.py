@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ormi.cli import (
+from orfmi.cli import (
     EXIT_ERROR,
     EXIT_FAILURE,
     EXIT_SUCCESS,
@@ -216,7 +216,7 @@ instance_types:
   - t3.micro
 """)
         setup_file.write_text("#!/bin/bash\necho 'Hello'")
-        with patch("ormi.cli.AmiBuilder") as mock_builder:
+        with patch("orfmi.cli.AmiBuilder") as mock_builder:
             mock_instance = MagicMock()
             mock_instance.build.return_value = "ami-test123"
             mock_builder.return_value = mock_instance
@@ -241,7 +241,7 @@ instance_types:
   - t3.micro
 """)
         setup_file.write_text("#!/bin/bash\necho 'Hello'")
-        with patch("ormi.cli.AmiBuilder") as mock_builder:
+        with patch("orfmi.cli.AmiBuilder") as mock_builder:
             mock_instance = MagicMock()
             mock_instance.build.side_effect = RuntimeError("Build failed")
             mock_builder.return_value = mock_instance

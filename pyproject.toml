@@ -25,17 +25,17 @@ dependencies = [
 description = "Open Rainforest Machine Image - CLI tool for creating AWS AMIs"
 dynamic = ["version"]
 license = "Apache-2.0"
-name = "ormi"
+name = "orfmi"
 readme = "README.md"
 requires-python = ">=3.10"
 
 [project.scripts]
-ormi = "ormi.cli:main"
+orfmi = "orfmi.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/10U-Labs-LLC/ormi"
-Issues = "https://github.com/10U-Labs-LLC/ormi/issues"
-Repository = "https://github.com/10U-Labs-LLC/ormi"
+Homepage = "https://github.com/10U-Labs-LLC/orfmi"
+Issues = "https://github.com/10U-Labs-LLC/orfmi/issues"
+Repository = "https://github.com/10U-Labs-LLC/orfmi"
 
 [tool.setuptools_scm]
 

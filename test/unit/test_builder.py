@@ -5,8 +5,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ormi.builder import AmiBuilder, BuildContext, BuildState
-from ormi.config import AmiConfig
+from orfmi.builder import AmiBuilder, BuildContext, BuildState
+from orfmi.config import AmiConfig
 
 
 @pytest.mark.unit
@@ -90,21 +90,21 @@ class TestAmiBuilder:
         builder = AmiBuilder(config, setup_script, extra_files)
         assert builder.extra_files == extra_files
 
-    @patch("ormi.builder.create_ec2_client")
-    @patch("ormi.builder.generate_unique_id")
-    @patch("ormi.builder.get_vpc_from_subnet")
-    @patch("ormi.builder.create_key_pair")
-    @patch("ormi.builder.create_security_group")
-    @patch("ormi.builder.lookup_source_ami")
-    @patch("ormi.builder.create_launch_template")
-    @patch("ormi.builder.create_fleet_instance")
-    @patch("ormi.builder.wait_for_instance")
-    @patch("ormi.builder.run_setup_script")
-    @patch("ormi.builder.create_ami")
-    @patch("ormi.builder.terminate_instance")
-    @patch("ormi.builder.delete_launch_template")
-    @patch("ormi.builder.delete_key_pair")
-    @patch("ormi.builder.delete_security_group")
+    @patch("orfmi.builder.create_ec2_client")
+    @patch("orfmi.builder.generate_unique_id")
+    @patch("orfmi.builder.get_vpc_from_subnet")
+    @patch("orfmi.builder.create_key_pair")
+    @patch("orfmi.builder.create_security_group")
+    @patch("orfmi.builder.lookup_source_ami")
+    @patch("orfmi.builder.create_launch_template")
+    @patch("orfmi.builder.create_fleet_instance")
+    @patch("orfmi.builder.wait_for_instance")
+    @patch("orfmi.builder.run_setup_script")
+    @patch("orfmi.builder.create_ami")
+    @patch("orfmi.builder.terminate_instance")
+    @patch("orfmi.builder.delete_launch_template")
+    @patch("orfmi.builder.delete_key_pair")
+    @patch("orfmi.builder.delete_security_group")
     def test_build_success(
         self,
         mock_delete_sg: MagicMock,
@@ -159,18 +159,18 @@ class TestAmiBuilder:
         mock_terminate.assert_called_once()
         mock_delete_sg.assert_called_once()
 
-    @patch("ormi.builder.create_ec2_client")
-    @patch("ormi.builder.generate_unique_id")
-    @patch("ormi.builder.get_vpc_from_subnet")
-    @patch("ormi.builder.create_key_pair")
-    @patch("ormi.builder.create_security_group")
-    @patch("ormi.builder.lookup_source_ami")
-    @patch("ormi.builder.create_launch_template")
-    @patch("ormi.builder.create_fleet_instance")
-    @patch("ormi.builder.terminate_instance")
-    @patch("ormi.builder.delete_launch_template")
-    @patch("ormi.builder.delete_key_pair")
-    @patch("ormi.builder.delete_security_group")
+    @patch("orfmi.builder.create_ec2_client")
+    @patch("orfmi.builder.generate_unique_id")
+    @patch("orfmi.builder.get_vpc_from_subnet")
+    @patch("orfmi.builder.create_key_pair")
+    @patch("orfmi.builder.create_security_group")
+    @patch("orfmi.builder.lookup_source_ami")
+    @patch("orfmi.builder.create_launch_template")
+    @patch("orfmi.builder.create_fleet_instance")
+    @patch("orfmi.builder.terminate_instance")
+    @patch("orfmi.builder.delete_launch_template")
+    @patch("orfmi.builder.delete_key_pair")
+    @patch("orfmi.builder.delete_security_group")
     def test_cleanup_on_failure(
         self,
         mock_delete_sg: MagicMock,
@@ -215,20 +215,20 @@ class TestAmiBuilder:
         mock_delete_key.assert_called_once()
         mock_delete_template.assert_called_once()
 
-    @patch("ormi.builder.create_ec2_client")
-    @patch("ormi.builder.generate_unique_id")
-    @patch("ormi.builder.get_vpc_from_subnet")
-    @patch("ormi.builder.create_key_pair")
-    @patch("ormi.builder.create_security_group")
-    @patch("ormi.builder.lookup_source_ami")
-    @patch("ormi.builder.create_launch_template")
-    @patch("ormi.builder.create_fleet_instance")
-    @patch("ormi.builder.wait_for_instance")
-    @patch("ormi.builder.create_ami")
-    @patch("ormi.builder.terminate_instance")
-    @patch("ormi.builder.delete_launch_template")
-    @patch("ormi.builder.delete_key_pair")
-    @patch("ormi.builder.delete_security_group")
+    @patch("orfmi.builder.create_ec2_client")
+    @patch("orfmi.builder.generate_unique_id")
+    @patch("orfmi.builder.get_vpc_from_subnet")
+    @patch("orfmi.builder.create_key_pair")
+    @patch("orfmi.builder.create_security_group")
+    @patch("orfmi.builder.lookup_source_ami")
+    @patch("orfmi.builder.create_launch_template")
+    @patch("orfmi.builder.create_fleet_instance")
+    @patch("orfmi.builder.wait_for_instance")
+    @patch("orfmi.builder.create_ami")
+    @patch("orfmi.builder.terminate_instance")
+    @patch("orfmi.builder.delete_launch_template")
+    @patch("orfmi.builder.delete_key_pair")
+    @patch("orfmi.builder.delete_security_group")
     def test_skips_script_if_not_exists(
         self,
         mock_delete_sg: MagicMock,

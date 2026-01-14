@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ormi.cli import EXIT_ERROR, EXIT_FAILURE, EXIT_SUCCESS
+from orfmi.cli import EXIT_ERROR, EXIT_FAILURE, EXIT_SUCCESS
 from test.conftest import run_main_with_args
 
 
@@ -62,7 +62,7 @@ instance_types:
         setup_file = tmp_path / "setup.sh"
         setup_file.write_text("#!/bin/bash\necho 'Hello'")
 
-        with patch("ormi.cli.AmiBuilder") as mock_builder:
+        with patch("orfmi.cli.AmiBuilder") as mock_builder:
             mock_instance = MagicMock()
             mock_instance.build.return_value = "ami-12345"
             mock_builder.return_value = mock_instance
@@ -87,7 +87,7 @@ instance_types:
         setup_file = tmp_path / "setup.sh"
         setup_file.write_text("#!/bin/bash\necho 'Hello'")
 
-        with patch("ormi.cli.AmiBuilder") as mock_builder:
+        with patch("orfmi.cli.AmiBuilder") as mock_builder:
             mock_instance = MagicMock()
             mock_instance.build.side_effect = RuntimeError("Build failed")
             mock_builder.return_value = mock_instance
@@ -117,7 +117,7 @@ instance_types:
         setup_file = tmp_path / "setup.sh"
         setup_file.write_text("#!/bin/bash\necho 'Hello'")
 
-        with patch("ormi.cli.AmiBuilder") as mock_builder:
+        with patch("orfmi.cli.AmiBuilder") as mock_builder:
             mock_instance = MagicMock()
             mock_instance.build.return_value = "ami-output123"
             mock_builder.return_value = mock_instance
@@ -159,7 +159,7 @@ tags:
         setup_file = tmp_path / "setup.sh"
         setup_file.write_text("#!/bin/bash\necho 'Hello'")
 
-        with patch("ormi.cli.AmiBuilder") as mock_builder:
+        with patch("orfmi.cli.AmiBuilder") as mock_builder:
             mock_instance = MagicMock()
             mock_instance.build.return_value = "ami-12345"
             mock_builder.return_value = mock_instance
@@ -200,7 +200,7 @@ instance_types:
         extra2 = tmp_path / "extra2.txt"
         extra2.write_text("extra2")
 
-        with patch("ormi.cli.AmiBuilder") as mock_builder:
+        with patch("orfmi.cli.AmiBuilder") as mock_builder:
             mock_instance = MagicMock()
             mock_instance.build.return_value = "ami-12345"
             mock_builder.return_value = mock_instance

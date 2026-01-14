@@ -1,4 +1,4 @@
-"""Command-line interface for ORMI."""
+"""Command-line interface for ORFMI."""
 
 import argparse
 import logging
@@ -16,7 +16,7 @@ EXIT_ERROR = 2
 def create_parser() -> argparse.ArgumentParser:
     """Create and configure the argument parser."""
     parser = argparse.ArgumentParser(
-        prog="ormi",
+        prog="orfmi",
         description="Open Rainforest Machine Image - Create AWS AMIs from configuration.",
     )
     parser.add_argument(

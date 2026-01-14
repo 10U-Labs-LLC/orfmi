@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ormi.ec2 import (
+from orfmi.ec2 import (
     FleetConfig,
     LaunchTemplateParams,
     create_ami,
