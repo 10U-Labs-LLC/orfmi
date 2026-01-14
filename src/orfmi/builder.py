@@ -155,6 +155,9 @@ class AmiBuilder:
 
         self._launch_and_configure(ctx, state, template_name)
 
+        if not state.instance_id:
+            raise RuntimeError("Instance ID not set after launch")
+
         state.result = create_ami(
             ec2,
             state.instance_id,
@@ -188,6 +191,9 @@ class AmiBuilder:
         logger.info("Instance ready at %s", public_ip)
 
         if ctx.setup_script.exists():
+            if not state.key_material:
+                raise RuntimeError("Key material not set")
+
             logger.info("Running setup script...")
             ssh_config = SshConfig(
                 ip_address=public_ip,
