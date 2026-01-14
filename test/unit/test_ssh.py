@@ -140,6 +140,26 @@ class TestConnectSsh:
         with pytest.raises(RuntimeError, match="Failed to connect"):
             connect_ssh(config)
 
+    @patch("orfmi.ssh.paramiko.Ed25519Key.from_private_key")
+    @patch("orfmi.ssh.paramiko.SSHClient")
+    def test_raises_when_retries_is_zero(
+        self,
+        mock_client_class: MagicMock,
+        mock_key_class: MagicMock,
+    ) -> None:
+        """Test that RuntimeError is raised when retries is 0."""
+        mock_client_class.return_value = MagicMock()
+        mock_key_class.return_value = MagicMock()
+
+        config = SshConfig(
+            ip_address="1.2.3.4",
+            key_material="private-key",
+            username="admin",
+            retries=0,
+        )
+        with pytest.raises(RuntimeError, match="retries was 0"):
+            connect_ssh(config)
+
 
 @pytest.mark.unit
 class TestUploadFile:

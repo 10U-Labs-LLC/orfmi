@@ -50,7 +50,7 @@ def connect_ssh(config: SshConfig) -> paramiko.SSHClient:
         Connected SSHClient.
 
     Raises:
-        RuntimeError: If connection fails after all retries.
+        RuntimeError: If connection fails after all retries or retries is 0.
     """
     key = paramiko.Ed25519Key.from_private_key(StringIO(config.key_material))
     client = paramiko.SSHClient()
@@ -77,8 +77,7 @@ def connect_ssh(config: SshConfig) -> paramiko.SSHClient:
                 ) from exc
             time.sleep(10)
 
-    # This point is unreachable as the loop always returns or raises
-    raise AssertionError("Unreachable code")  # pragma: no cover
+    raise RuntimeError(f"Failed to connect to {config.ip_address}: retries was 0")
 
 
 def upload_file(sftp: paramiko.SFTPClient, local_path: Path, remote_path: str) -> None:

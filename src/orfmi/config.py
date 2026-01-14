@@ -23,6 +23,8 @@ class InstanceSettings:
     subnet_ids: list[str]
     instance_types: list[str]
     iam_instance_profile: str | None = None
+    purchase_type: str = "on-demand"
+    max_retries: int = 3
 
 
 @dataclass(frozen=True)
@@ -73,6 +75,15 @@ def _validate_platform(data: dict[str, Any]) -> None:
         raise ConfigError(f"Invalid platform: {platform}. Must be 'linux' or 'windows'")
 
 
+def _validate_purchase_type(data: dict[str, Any]) -> None:
+    """Validate purchase_type field."""
+    purchase_type = data.get("purchase_type", "on-demand")
+    if purchase_type not in ("on-demand", "spot"):
+        raise ConfigError(
+            f"Invalid purchase_type: {purchase_type}. Must be 'on-demand' or 'spot'"
+        )
+
+
 def _parse_tags(data: dict[str, Any]) -> dict[str, str]:
     """Parse tags from configuration data."""
     tags = data.get("tags", {})
@@ -109,6 +120,7 @@ def load_config(config_path: Path) -> AmiConfig:
     _validate_required_fields(data)
     _validate_list_fields(data)
     _validate_platform(data)
+    _validate_purchase_type(data)
 
     ssh_settings = SSHSettings(
         username=str(data.get("ssh_username", "admin")),
@@ -119,6 +131,8 @@ def load_config(config_path: Path) -> AmiConfig:
         subnet_ids=[str(s) for s in data["subnet_ids"]],
         instance_types=[str(t) for t in data["instance_types"]],
         iam_instance_profile=data.get("iam_instance_profile"),
+        purchase_type=str(data.get("purchase_type", "on-demand")),
+        max_retries=int(data.get("max_retries", 3)),
     )
     ami_identity = AmiIdentity(
         name=str(data["ami_name"]),

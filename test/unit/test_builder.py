@@ -6,8 +6,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from botocore.exceptions import ClientError
+
 from orfmi.builder import AmiBuilder, BuildContext, BuildState
 from orfmi.config import AmiConfig, AmiIdentity, InstanceSettings
+from orfmi.ec2 import CapacityError, InstanceTerminatedError
 
 
 def make_test_config() -> AmiConfig:
@@ -294,3 +297,106 @@ class TestAmiBuilder:
         builder = AmiBuilder(make_test_config(), setup_script)
         with pytest.raises(RuntimeError, match="Key material not set"):
             builder.build()
+
+    def test_calls_check_instance_state(
+        self, tmp_path: Path, builder_mocks: dict[str, Any]
+    ) -> None:
+        """Test that check_instance_state is called."""
+        setup_script = tmp_path / "setup.sh"
+        setup_script.write_text("#!/bin/bash\necho 'Hello'")
+        builder = AmiBuilder(make_test_config(), setup_script)
+        builder.build()
+        assert builder_mocks["check_state"].call_count == 2
+
+
+@pytest.mark.unit
+class TestAmiBuilderRetry:
+    """Tests for AmiBuilder retry logic."""
+
+    def test_retries_on_capacity_error(
+        self, tmp_path: Path, builder_mocks: dict[str, Any]
+    ) -> None:
+        """Test that build retries on CapacityError."""
+        builder_mocks["create_fleet"].side_effect = [
+            CapacityError("No capacity"),
+            "i-12345",
+        ]
+        setup_script = tmp_path / "setup.sh"
+        setup_script.write_text("#!/bin/bash\necho 'Hello'")
+        builder = AmiBuilder(make_test_config(), setup_script)
+        result = builder.build()
+        assert result == "ami-result"
+
+    def test_retries_on_instance_terminated_error(
+        self, tmp_path: Path, builder_mocks: dict[str, Any]
+    ) -> None:
+        """Test that build retries on InstanceTerminatedError."""
+        builder_mocks["check_state"].side_effect = [
+            InstanceTerminatedError("Spot interrupted"),
+            None,
+            None,
+        ]
+        setup_script = tmp_path / "setup.sh"
+        setup_script.write_text("#!/bin/bash\necho 'Hello'")
+        builder = AmiBuilder(make_test_config(), setup_script)
+        result = builder.build()
+        assert result == "ami-result"
+
+    def test_raises_after_max_retries(
+        self, tmp_path: Path, builder_mocks: dict[str, Any]
+    ) -> None:
+        """Test that RuntimeError is raised after max retries."""
+        builder_mocks["create_fleet"].side_effect = CapacityError("No capacity")
+        setup_script = tmp_path / "setup.sh"
+        setup_script.write_text("#!/bin/bash\necho 'Hello'")
+        builder = AmiBuilder(make_test_config(), setup_script)
+        with pytest.raises(RuntimeError, match="Build failed after"):
+            builder.build()
+
+    def test_cleans_up_instance_on_retry(
+        self, tmp_path: Path, builder_mocks: dict[str, Any]
+    ) -> None:
+        """Test that instance is cleaned up on retry."""
+        builder_mocks["check_state"].side_effect = [
+            InstanceTerminatedError("Spot interrupted"),
+            None,
+            None,
+        ]
+        setup_script = tmp_path / "setup.sh"
+        setup_script.write_text("#!/bin/bash\necho 'Hello'")
+        builder = AmiBuilder(make_test_config(), setup_script)
+        builder.build()
+        assert builder_mocks["terminate"].call_count == 2
+
+    def test_sleeps_between_retries(
+        self, tmp_path: Path, builder_mocks: dict[str, Any]
+    ) -> None:
+        """Test that sleep is called between retries."""
+        builder_mocks["create_fleet"].side_effect = [
+            CapacityError("No capacity"),
+            "i-12345",
+        ]
+        setup_script = tmp_path / "setup.sh"
+        setup_script.write_text("#!/bin/bash\necho 'Hello'")
+        builder = AmiBuilder(make_test_config(), setup_script)
+        builder.build()
+        assert builder_mocks["time_sleep"].call_count == 1
+
+    def test_handles_terminate_error_on_cleanup(
+        self, tmp_path: Path, builder_mocks: dict[str, Any]
+    ) -> None:
+        """Test that terminate errors are handled during cleanup."""
+        builder_mocks["check_state"].side_effect = [
+            InstanceTerminatedError("Spot interrupted"),
+            None,
+            None,
+        ]
+        builder_mocks["terminate"].side_effect = [
+            ClientError({"Error": {"Code": "InvalidInstanceID"}}, "TerminateInstances"),
+            None,
+        ]
+        setup_script = tmp_path / "setup.sh"
+        setup_script.write_text("#!/bin/bash\necho 'Hello'")
+        builder = AmiBuilder(make_test_config(), setup_script)
+        result = builder.build()
+        assert result == "ami-result"

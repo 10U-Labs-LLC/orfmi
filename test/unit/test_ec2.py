@@ -7,8 +7,11 @@ import pytest
 from botocore.exceptions import ClientError
 
 from orfmi.ec2 import (
+    CapacityError,
     FleetConfig,
+    InstanceTerminatedError,
     LaunchTemplateParams,
+    check_instance_state,
     create_ami,
     create_ec2_client,
     create_fleet_instance,
@@ -21,6 +24,7 @@ from orfmi.ec2 import (
     generate_unique_id,
     get_instance_public_ip,
     get_vpc_from_subnet,
+    is_capacity_error,
     lookup_source_ami,
     terminate_instance,
     wait_for_instance,
@@ -460,3 +464,196 @@ class TestCreateEc2Client:
         """Test that region is passed to boto3.client."""
         create_ec2_client("us-west-2")
         assert mock_client.call_args.kwargs["region_name"] == "us-west-2"
+
+
+@pytest.mark.unit
+class TestIsCapacityError:
+    """Tests for is_capacity_error function."""
+
+    def test_returns_true_for_capacity_error(self) -> None:
+        """Test that True is returned for capacity error codes."""
+        errors = [{"ErrorCode": "InsufficientInstanceCapacity"}]
+        assert is_capacity_error(errors) is True
+
+    def test_returns_true_for_spot_limit_error(self) -> None:
+        """Test that True is returned for spot limit error."""
+        errors = [{"ErrorCode": "MaxSpotInstanceCountExceeded"}]
+        assert is_capacity_error(errors) is True
+
+    def test_returns_false_for_other_error(self) -> None:
+        """Test that False is returned for non-capacity errors."""
+        errors = [{"ErrorCode": "InvalidParameterValue"}]
+        assert is_capacity_error(errors) is False
+
+    def test_returns_false_for_empty_list(self) -> None:
+        """Test that False is returned for empty error list."""
+        assert is_capacity_error([]) is False
+
+    def test_returns_true_when_mixed_errors(self) -> None:
+        """Test that True is returned when any error is capacity-related."""
+        errors = [
+            {"ErrorCode": "InvalidParameterValue"},
+            {"ErrorCode": "InsufficientCapacity"},
+        ]
+        assert is_capacity_error(errors) is True
+
+
+@pytest.mark.unit
+class TestCheckInstanceState:
+    """Tests for check_instance_state function."""
+
+    def test_no_error_when_running(self) -> None:
+        """Test that no error is raised when instance is running."""
+        ec2 = MagicMock()
+        ec2.describe_instances.return_value = {
+            "Reservations": [{"Instances": [{"State": {"Name": "running"}}]}]
+        }
+        check_instance_state(ec2, "i-12345")
+        assert ec2.describe_instances.call_count == 1
+
+    def test_raises_when_terminated(self) -> None:
+        """Test that InstanceTerminatedError is raised when terminated."""
+        ec2 = MagicMock()
+        ec2.describe_instances.return_value = {
+            "Reservations": [{
+                "Instances": [{
+                    "State": {"Name": "terminated"},
+                    "StateReason": {"Message": "User initiated"},
+                }]
+            }]
+        }
+        with pytest.raises(InstanceTerminatedError, match="terminated"):
+            check_instance_state(ec2, "i-12345")
+
+    def test_raises_when_stopped(self) -> None:
+        """Test that InstanceTerminatedError is raised when stopped."""
+        ec2 = MagicMock()
+        ec2.describe_instances.return_value = {
+            "Reservations": [{
+                "Instances": [{
+                    "State": {"Name": "stopped"},
+                    "StateReason": {"Message": "Spot interrupted"},
+                }]
+            }]
+        }
+        with pytest.raises(InstanceTerminatedError, match="stopped"):
+            check_instance_state(ec2, "i-12345")
+
+    def test_includes_reason_in_error(self) -> None:
+        """Test that state reason is included in error message."""
+        ec2 = MagicMock()
+        ec2.describe_instances.return_value = {
+            "Reservations": [{
+                "Instances": [{
+                    "State": {"Name": "shutting-down"},
+                    "StateReason": {"Message": "Client.SpotInstanceTermination"},
+                }]
+            }]
+        }
+        with pytest.raises(InstanceTerminatedError, match="SpotInstanceTermination"):
+            check_instance_state(ec2, "i-12345")
+
+    def test_handles_missing_state_reason(self) -> None:
+        """Test that missing StateReason is handled."""
+        ec2 = MagicMock()
+        ec2.describe_instances.return_value = {
+            "Reservations": [{
+                "Instances": [{"State": {"Name": "terminated"}}]
+            }]
+        }
+        with pytest.raises(InstanceTerminatedError, match="Unknown"):
+            check_instance_state(ec2, "i-12345")
+
+
+@pytest.mark.unit
+class TestCreateFleetInstancePurchaseType:
+    """Tests for create_fleet_instance with purchase_type."""
+
+    def test_spot_purchase_type_uses_spot_options(self) -> None:
+        """Test that spot purchase type uses SpotOptions."""
+        ec2 = MagicMock()
+        ec2.describe_launch_templates.return_value = {
+            "LaunchTemplates": [{"LaunchTemplateId": "lt-12345"}]
+        }
+        ec2.create_fleet.return_value = {
+            "Instances": [{"InstanceIds": ["i-12345"]}]
+        }
+        config = FleetConfig(
+            instance_types=["t3.micro"],
+            subnet_ids=["subnet-12345"],
+            purchase_type="spot",
+        )
+        create_fleet_instance(ec2, "test-template", config)
+        call_kwargs = ec2.create_fleet.call_args.kwargs
+        assert "SpotOptions" in call_kwargs
+
+    def test_on_demand_purchase_type_uses_on_demand_options(self) -> None:
+        """Test that on-demand purchase type uses OnDemandOptions."""
+        ec2 = MagicMock()
+        ec2.describe_launch_templates.return_value = {
+            "LaunchTemplates": [{"LaunchTemplateId": "lt-12345"}]
+        }
+        ec2.create_fleet.return_value = {
+            "Instances": [{"InstanceIds": ["i-12345"]}]
+        }
+        config = FleetConfig(
+            instance_types=["t3.micro"],
+            subnet_ids=["subnet-12345"],
+            purchase_type="on-demand",
+        )
+        create_fleet_instance(ec2, "test-template", config)
+        call_kwargs = ec2.create_fleet.call_args.kwargs
+        assert "OnDemandOptions" in call_kwargs
+
+    def test_raises_capacity_error_on_capacity_failure(self) -> None:
+        """Test that CapacityError is raised for capacity failures."""
+        ec2 = MagicMock()
+        ec2.describe_launch_templates.return_value = {
+            "LaunchTemplates": [{"LaunchTemplateId": "lt-12345"}]
+        }
+        ec2.create_fleet.return_value = {
+            "Instances": [],
+            "Errors": [{"ErrorCode": "InsufficientInstanceCapacity"}],
+        }
+        config = FleetConfig(
+            instance_types=["t3.micro"],
+            subnet_ids=["subnet-12345"],
+        )
+        with pytest.raises(CapacityError, match="Capacity error"):
+            create_fleet_instance(ec2, "test-template", config)
+
+    def test_raises_runtime_error_on_other_failure(self) -> None:
+        """Test that RuntimeError is raised for non-capacity failures."""
+        ec2 = MagicMock()
+        ec2.describe_launch_templates.return_value = {
+            "LaunchTemplates": [{"LaunchTemplateId": "lt-12345"}]
+        }
+        ec2.create_fleet.return_value = {
+            "Instances": [],
+            "Errors": [{"ErrorCode": "InvalidParameterValue"}],
+        }
+        config = FleetConfig(
+            instance_types=["t3.micro"],
+            subnet_ids=["subnet-12345"],
+        )
+        with pytest.raises(RuntimeError, match="Failed to create fleet"):
+            create_fleet_instance(ec2, "test-template", config)
+
+    def test_sets_correct_target_capacity_type(self) -> None:
+        """Test that DefaultTargetCapacityType is set correctly."""
+        ec2 = MagicMock()
+        ec2.describe_launch_templates.return_value = {
+            "LaunchTemplates": [{"LaunchTemplateId": "lt-12345"}]
+        }
+        ec2.create_fleet.return_value = {
+            "Instances": [{"InstanceIds": ["i-12345"]}]
+        }
+        config = FleetConfig(
+            instance_types=["t3.micro"],
+            subnet_ids=["subnet-12345"],
+            purchase_type="spot",
+        )
+        create_fleet_instance(ec2, "test-template", config)
+        call_kwargs = ec2.create_fleet.call_args.kwargs
+        target_spec = call_kwargs["TargetCapacitySpecification"]
+        assert target_spec["DefaultTargetCapacityType"] == "spot"

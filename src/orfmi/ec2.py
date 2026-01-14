@@ -11,6 +11,23 @@ from botocore.exceptions import ClientError
 
 logger = logging.getLogger(__name__)
 
+RETRIABLE_ERROR_CODES = frozenset({
+    "InsufficientInstanceCapacity",
+    "InsufficientCapacity",
+    "InstanceLimitExceeded",
+    "MaxSpotInstanceCountExceeded",
+    "RequestLimitExceeded",
+    "ServiceUnavailable",
+})
+
+
+class CapacityError(Exception):
+    """Raised when instance creation fails due to capacity issues."""
+
+
+class InstanceTerminatedError(Exception):
+    """Raised when instance is no longer running."""
+
 
 @dataclass
 class LaunchTemplateParams:
@@ -30,6 +47,12 @@ class FleetConfig:
     instance_types: list[str]
     subnet_ids: list[str]
     allocation_strategy: str = "lowest-price"
+    purchase_type: str = "on-demand"
+
+
+def is_capacity_error(errors: list[dict[str, Any]]) -> bool:
+    """Check if any error is capacity-related."""
+    return any(e.get("ErrorCode") in RETRIABLE_ERROR_CODES for e in errors)
 
 
 def get_vpc_from_subnet(ec2: Any, subnet_id: str) -> str:
@@ -167,7 +190,8 @@ def create_fleet_instance(
         The instance ID of the created instance.
 
     Raises:
-        RuntimeError: If no instance was created.
+        CapacityError: If instance creation fails due to capacity issues.
+        RuntimeError: If no instance was created for other reasons.
     """
     response = ec2.describe_launch_templates(LaunchTemplateNames=[template_name])
     template_id = response["LaunchTemplates"][0]["LaunchTemplateId"]
@@ -178,8 +202,8 @@ def create_fleet_instance(
         for s in config.subnet_ids
     ]
 
-    fleet_response = ec2.create_fleet(
-        LaunchTemplateConfigs=[
+    fleet_params: dict[str, Any] = {
+        "LaunchTemplateConfigs": [
             {
                 "LaunchTemplateSpecification": {
                     "LaunchTemplateId": template_id,
@@ -188,21 +212,31 @@ def create_fleet_instance(
                 "Overrides": overrides,
             }
         ],
-        TargetCapacitySpecification={
+        "TargetCapacitySpecification": {
             "TotalTargetCapacity": 1,
-            "DefaultTargetCapacityType": "spot",
+            "DefaultTargetCapacityType": config.purchase_type,
         },
-        SpotOptions={
+        "Type": "instant",
+    }
+
+    if config.purchase_type == "spot":
+        fleet_params["SpotOptions"] = {
             "AllocationStrategy": config.allocation_strategy,
             "InstanceInterruptionBehavior": "terminate",
-        },
-        Type="instant",
-    )
+        }
+    else:
+        fleet_params["OnDemandOptions"] = {
+            "AllocationStrategy": config.allocation_strategy,
+        }
+
+    fleet_response = ec2.create_fleet(**fleet_params)
 
     instances = fleet_response.get("Instances", [])
     if not instances:
         errors = fleet_response.get("Errors", [])
         error_msg = "; ".join(str(e) for e in errors) if errors else "Unknown error"
+        if is_capacity_error(errors):
+            raise CapacityError(f"Capacity error creating instance: {error_msg}")
         raise RuntimeError(f"Failed to create fleet instance: {error_msg}")
 
     return str(instances[0]["InstanceIds"][0])
@@ -228,6 +262,27 @@ def get_instance_public_ip(ec2: Any, instance_id: str) -> str:
     """Get the public IP address of an EC2 instance."""
     response = ec2.describe_instances(InstanceIds=[instance_id])
     return str(response["Reservations"][0]["Instances"][0]["PublicIpAddress"])
+
+
+def check_instance_state(ec2: Any, instance_id: str) -> None:
+    """Verify instance is still running.
+
+    Args:
+        ec2: boto3 EC2 client.
+        instance_id: The instance ID to check.
+
+    Raises:
+        InstanceTerminatedError: If instance is not in running state.
+    """
+    response = ec2.describe_instances(InstanceIds=[instance_id])
+    instance = response["Reservations"][0]["Instances"][0]
+    state = instance["State"]["Name"]
+
+    if state != "running":
+        reason = instance.get("StateReason", {}).get("Message", "Unknown")
+        raise InstanceTerminatedError(
+            f"Instance {instance_id} is {state}: {reason}"
+        )
 
 
 def wait_for_instance(ec2: Any, instance_id: str) -> str:

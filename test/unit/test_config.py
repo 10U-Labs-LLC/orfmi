@@ -39,6 +39,14 @@ class TestAmiConfigDefaults:
         """Test platform defaults to linux."""
         assert minimal_config.platform == "linux"
 
+    def test_purchase_type_default(self, minimal_config: AmiConfig) -> None:
+        """Test purchase_type defaults to on-demand."""
+        assert minimal_config.instance.purchase_type == "on-demand"
+
+    def test_max_retries_default(self, minimal_config: AmiConfig) -> None:
+        """Test max_retries defaults to 3."""
+        assert minimal_config.instance.max_retries == 3
+
 
 @pytest.mark.unit
 class TestAmiConfigAllFields:
@@ -175,6 +183,54 @@ platform: windows
         config = load_config(config_file)
         assert config.platform == "windows"
 
+    def test_purchase_type_spot(self, tmp_path: Path) -> None:
+        """Test that purchase_type spot is loaded correctly."""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text("""
+ami_name: test-ami
+region: us-east-1
+source_ami: ami-12345
+subnet_ids:
+  - subnet-1
+instance_types:
+  - t3.micro
+purchase_type: spot
+""")
+        config = load_config(config_file)
+        assert config.instance.purchase_type == "spot"
+
+    def test_purchase_type_on_demand(self, tmp_path: Path) -> None:
+        """Test that purchase_type on-demand is loaded correctly."""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text("""
+ami_name: test-ami
+region: us-east-1
+source_ami: ami-12345
+subnet_ids:
+  - subnet-1
+instance_types:
+  - t3.micro
+purchase_type: on-demand
+""")
+        config = load_config(config_file)
+        assert config.instance.purchase_type == "on-demand"
+
+    def test_max_retries_loaded(self, tmp_path: Path) -> None:
+        """Test that max_retries is loaded correctly."""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text("""
+ami_name: test-ami
+region: us-east-1
+source_ami: ami-12345
+subnet_ids:
+  - subnet-1
+instance_types:
+  - t3.micro
+max_retries: 5
+""")
+        config = load_config(config_file)
+        assert config.instance.max_retries == 5
+
 
 @pytest.mark.unit
 class TestLoadConfigErrors:
@@ -269,4 +325,20 @@ tags:
         config_file = tmp_path / "config.yml"
         config_file.write_text("- item1\n- item2")
         with pytest.raises(ConfigError, match="Configuration must be a YAML mapping"):
+            load_config(config_file)
+
+    def test_invalid_purchase_type(self, tmp_path: Path) -> None:
+        """Test that ConfigError is raised for invalid purchase_type."""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text("""
+ami_name: test-ami
+region: us-east-1
+source_ami: ami-12345
+subnet_ids:
+  - subnet-1
+instance_types:
+  - t3.micro
+purchase_type: reserved
+""")
+        with pytest.raises(ConfigError, match="Invalid purchase_type"):
             load_config(config_file)

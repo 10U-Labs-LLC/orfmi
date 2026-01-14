@@ -1,14 +1,20 @@
 """AMI builder orchestration."""
 
 import logging
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from botocore.exceptions import ClientError
+
 from .config import AmiConfig
 from .ec2 import (
+    CapacityError,
     FleetConfig,
+    InstanceTerminatedError,
     LaunchTemplateParams,
+    check_instance_state,
     create_ami,
     create_ec2_client,
     create_fleet_instance,
@@ -169,7 +175,39 @@ class AmiBuilder:
     def _launch_and_configure(
         self, ctx: BuildContext, state: BuildState, template_name: str
     ) -> None:
-        """Launch instance and run configuration."""
+        """Launch instance and run configuration with retry logic."""
+        config = ctx.config
+        max_retries = config.instance.max_retries
+
+        for attempt in range(max_retries):
+            try:
+                self._single_launch_attempt(ctx, state, template_name)
+                return
+            except (CapacityError, InstanceTerminatedError) as e:
+                logger.warning(
+                    "Attempt %d/%d failed: %s", attempt + 1, max_retries, e
+                )
+                self._cleanup_instance(ctx, state)
+                if attempt < max_retries - 1:
+                    delay = min(30 * (2**attempt), 300)
+                    logger.info("Retrying in %d seconds...", delay)
+                    time.sleep(delay)
+
+        raise RuntimeError(f"Build failed after {max_retries} attempts")
+
+    def _cleanup_instance(self, ctx: BuildContext, state: BuildState) -> None:
+        """Clean up only the instance for retry."""
+        if state.instance_id:
+            try:
+                terminate_instance(ctx.ec2, state.instance_id)
+            except ClientError as e:
+                logger.warning("Failed to terminate instance: %s", e)
+            state.instance_id = None
+
+    def _single_launch_attempt(
+        self, ctx: BuildContext, state: BuildState, template_name: str
+    ) -> None:
+        """Execute a single launch attempt."""
         config = ctx.config
         ec2 = ctx.ec2
 
@@ -183,12 +221,15 @@ class AmiBuilder:
         fleet_config = FleetConfig(
             instance_types=config.instance.instance_types,
             subnet_ids=config.instance.subnet_ids,
+            purchase_type=config.instance.purchase_type,
         )
         state.instance_id = create_fleet_instance(ec2, template_name, fleet_config)
         logger.info("Instance launched: %s", state.instance_id)
 
         public_ip = wait_for_instance(ec2, state.instance_id)
         logger.info("Instance ready at %s", public_ip)
+
+        check_instance_state(ec2, state.instance_id)
 
         if ctx.setup_script.exists():
             if not state.key_material:
@@ -203,6 +244,8 @@ class AmiBuilder:
                 retries=config.ssh.retries,
             )
             run_setup_script(ssh_config, ctx.setup_script, ctx.extra_files)
+
+        check_instance_state(ec2, state.instance_id)
 
     def _cleanup(self, ctx: BuildContext, state: BuildState) -> None:
         """Clean up temporary resources created during the build."""

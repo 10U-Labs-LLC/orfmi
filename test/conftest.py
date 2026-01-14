@@ -68,12 +68,14 @@ def builder_mocks() -> Generator[dict[str, Any], None, None]:
         "create_template": patch("orfmi.builder.create_launch_template"),
         "create_fleet": patch("orfmi.builder.create_fleet_instance"),
         "wait": patch("orfmi.builder.wait_for_instance"),
+        "check_state": patch("orfmi.builder.check_instance_state"),
         "run_script": patch("orfmi.builder.run_setup_script"),
         "create_ami": patch("orfmi.builder.create_ami"),
         "terminate": patch("orfmi.builder.terminate_instance"),
         "delete_template": patch("orfmi.builder.delete_launch_template"),
         "delete_key": patch("orfmi.builder.delete_key_pair"),
         "delete_sg": patch("orfmi.builder.delete_security_group"),
+        "time_sleep": patch("orfmi.builder.time.sleep"),
     }
     mocks = {name: p.start() for name, p in patches.items()}
     mock_ec2 = MagicMock()
@@ -123,10 +125,8 @@ def missing_setup_validation(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> tuple[bool, str]:
     """Run validate_files with missing setup file."""
-    config_file = tmp_path / "config.yml"
     setup_file = tmp_path / "nonexistent.sh"
-    config_file.touch()
-    result = validate_files(config_file, setup_file)
+    result = validate_files(None, setup_file)
     captured = capsys.readouterr()
     return result, captured.err
 
