@@ -16,7 +16,8 @@ jobs:
         run: |
           pip install yamllint pylint pytest mypy pytest-cov \
             types-PyYAML boto3-stubs botocore-stubs types-paramiko \
-            assert-no-linter-config-files assert-no-inline-directives -e .
+            assert-no-linter-config-files assert-no-inline-directives \
+            assert-one-assert-per-pytest -e .
       - name: assert-no-linter-config-files
         run: |
           assert-no-linter-config-files \
@@ -27,6 +28,8 @@ jobs:
           assert-no-inline-directives \
             --tools coverage,mypy,pylint,yamllint --verbose \
             **/*.py **/*.yml **/*.toml
+      - name: assert-one-assert-per-pytest
+        run: assert-one-assert-per-pytest --verbose test/
       - name: yamllint
         run: |
           EMPTY_LINES='empty-lines: {max: 0, max-start: 0, max-end: 1}'
