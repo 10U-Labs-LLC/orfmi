@@ -21,20 +21,15 @@ jobs:
       - name: assert-no-linter-config-files
         run: |
           assert-no-linter-config-files \
-            --directories . \
-            --linters mypy,pylint,yamllint \
-            --verbose
+            --linters mypy,pylint,yamllint --verbose .
       - name: assert-no-inline-directives
         run: |
+          shopt -s globstar
           assert-no-inline-directives \
-            --files "**/*.py" "**/*.yml" "**/*.toml" \
-            --tools coverage,mypy,pylint,yamllint \
-            --verbose
+            --tools coverage,mypy,pylint,yamllint --verbose \
+            **/*.py **/*.yml **/*.toml
       - name: assert-one-assert-per-pytest
-        run: |
-          assert-one-assert-per-pytest \
-            --files "test/**/*.py" \
-            --verbose
+        run: assert-one-assert-per-pytest --verbose test/
       - name: yamllint
         run: |
           EMPTY_LINES='empty-lines: {max: 0, max-start: 0, max-end: 1}'
