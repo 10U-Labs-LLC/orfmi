@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from orfmi.cli import EXIT_ERROR, EXIT_FAILURE, EXIT_SUCCESS
-from test.conftest import run_main_with_args
+from test.conftest import VALID_CONFIG_YAML, create_test_files, run_main_with_args
 
 
 @pytest.mark.integration
@@ -49,23 +49,9 @@ class TestCliExitCodes:
 
     def test_exit_success_with_mock_builder(self, tmp_path: Path) -> None:
         """Test exit code for successful build."""
-        config_file = tmp_path / "config.yml"
-        config_file.write_text("""
-ami_name: test-ami
-region: us-east-1
-source_ami: debian-12-*
-subnet_ids:
-  - subnet-12345
-instance_types:
-  - t3.micro
-""")
-        setup_file = tmp_path / "setup.sh"
-        setup_file.write_text("#!/bin/bash\necho 'Hello'")
-
+        config_file, setup_file = create_test_files(tmp_path)
         with patch("orfmi.cli.AmiBuilder") as mock_builder:
-            mock_instance = MagicMock()
-            mock_instance.build.return_value = "ami-12345"
-            mock_builder.return_value = mock_instance
+            mock_builder.return_value.build.return_value = "ami-12345"
             exit_code = run_main_with_args([
                 "--config-file", str(config_file),
                 "--setup-file", str(setup_file),
@@ -74,23 +60,9 @@ instance_types:
 
     def test_exit_failure_on_build_error(self, tmp_path: Path) -> None:
         """Test exit code when build fails."""
-        config_file = tmp_path / "config.yml"
-        config_file.write_text("""
-ami_name: test-ami
-region: us-east-1
-source_ami: debian-12-*
-subnet_ids:
-  - subnet-12345
-instance_types:
-  - t3.micro
-""")
-        setup_file = tmp_path / "setup.sh"
-        setup_file.write_text("#!/bin/bash\necho 'Hello'")
-
+        config_file, setup_file = create_test_files(tmp_path)
         with patch("orfmi.cli.AmiBuilder") as mock_builder:
-            mock_instance = MagicMock()
-            mock_instance.build.side_effect = RuntimeError("Build failed")
-            mock_builder.return_value = mock_instance
+            mock_builder.return_value.build.side_effect = RuntimeError("Build failed")
             exit_code = run_main_with_args([
                 "--config-file", str(config_file),
                 "--setup-file", str(setup_file),
@@ -102,25 +74,13 @@ instance_types:
 class TestCliOutput:
     """Integration tests for CLI output."""
 
-    def test_outputs_ami_id(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_outputs_ami_id(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """Test that AMI ID is output on success."""
-        config_file = tmp_path / "config.yml"
-        config_file.write_text("""
-ami_name: test-ami
-region: us-east-1
-source_ami: debian-12-*
-subnet_ids:
-  - subnet-12345
-instance_types:
-  - t3.micro
-""")
-        setup_file = tmp_path / "setup.sh"
-        setup_file.write_text("#!/bin/bash\necho 'Hello'")
-
+        config_file, setup_file = create_test_files(tmp_path)
         with patch("orfmi.cli.AmiBuilder") as mock_builder:
-            mock_instance = MagicMock()
-            mock_instance.build.return_value = "ami-output123"
-            mock_builder.return_value = mock_instance
+            mock_builder.return_value.build.return_value = "ami-output123"
             run_main_with_args([
                 "--config-file", str(config_file),
                 "--setup-file", str(setup_file),
@@ -160,9 +120,7 @@ tags:
         setup_file.write_text("#!/bin/bash\necho 'Hello'")
 
         with patch("orfmi.cli.AmiBuilder") as mock_builder:
-            mock_instance = MagicMock()
-            mock_instance.build.return_value = "ami-12345"
-            mock_builder.return_value = mock_instance
+            mock_builder.return_value.build.return_value = "ami-12345"
             exit_code = run_main_with_args([
                 "--config-file", str(config_file),
                 "--setup-file", str(setup_file),
@@ -183,27 +141,14 @@ class TestCliExtraFiles:
 
     def test_passes_extra_files_to_builder(self, tmp_path: Path) -> None:
         """Test that extra files are passed to builder."""
-        config_file = tmp_path / "config.yml"
-        config_file.write_text("""
-ami_name: test-ami
-region: us-east-1
-source_ami: debian-12-*
-subnet_ids:
-  - subnet-12345
-instance_types:
-  - t3.micro
-""")
-        setup_file = tmp_path / "setup.sh"
-        setup_file.write_text("#!/bin/bash\necho 'Hello'")
+        config_file, setup_file = create_test_files(tmp_path)
         extra1 = tmp_path / "extra1.txt"
         extra1.write_text("extra1")
         extra2 = tmp_path / "extra2.txt"
         extra2.write_text("extra2")
 
         with patch("orfmi.cli.AmiBuilder") as mock_builder:
-            mock_instance = MagicMock()
-            mock_instance.build.return_value = "ami-12345"
-            mock_builder.return_value = mock_instance
+            mock_builder.return_value.build.return_value = "ami-12345"
             exit_code = run_main_with_args([
                 "--config-file", str(config_file),
                 "--setup-file", str(setup_file),

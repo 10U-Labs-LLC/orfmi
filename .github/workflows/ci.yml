@@ -86,7 +86,7 @@ jobs:
       - continue-on-error: true
         id: jscpd_test
         name: jscpd (test)
-        run: jscpd --pattern "**/*.py" --threshold 3 --reporters console test/
+        run: jscpd --pattern "**/*.py" --threshold 0 --reporters console test/
       - continue-on-error: true
         id: unit_tests
         name: Unit tests

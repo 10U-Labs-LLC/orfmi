@@ -14,7 +14,7 @@ from orfmi.cli import (
     setup_logging,
     validate_files,
 )
-from test.conftest import run_main_with_args
+from test.conftest import create_test_files, run_main_with_args
 
 
 @pytest.mark.unit
@@ -144,7 +144,9 @@ class TestValidateFiles:
         setup_file.touch()
         assert validate_files(config_file, setup_file) is True
 
-    def test_config_file_missing(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_config_file_missing(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """Test when config file is missing."""
         config_file = tmp_path / "nonexistent.yml"
         setup_file = tmp_path / "setup.sh"
@@ -153,7 +155,9 @@ class TestValidateFiles:
         captured = capsys.readouterr()
         assert "Configuration file not found" in captured.err
 
-    def test_setup_file_missing(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_setup_file_missing(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """Test when setup file is missing."""
         config_file = tmp_path / "config.yml"
         setup_file = tmp_path / "nonexistent.sh"
@@ -201,18 +205,7 @@ class TestMain:
 
     def test_successful_build(self, tmp_path: Path) -> None:
         """Test successful build returns AMI ID."""
-        config_file = tmp_path / "config.yml"
-        setup_file = tmp_path / "setup.sh"
-        config_file.write_text("""
-ami_name: test-ami
-region: us-east-1
-source_ami: debian-12-*
-subnet_ids:
-  - subnet-12345
-instance_types:
-  - t3.micro
-""")
-        setup_file.write_text("#!/bin/bash\necho 'Hello'")
+        config_file, setup_file = create_test_files(tmp_path)
         with patch("orfmi.cli.AmiBuilder") as mock_builder:
             mock_instance = MagicMock()
             mock_instance.build.return_value = "ami-test123"
@@ -225,18 +218,7 @@ instance_types:
 
     def test_build_failure(self, tmp_path: Path) -> None:
         """Test build failure returns failure exit code."""
-        config_file = tmp_path / "config.yml"
-        setup_file = tmp_path / "setup.sh"
-        config_file.write_text("""
-ami_name: test-ami
-region: us-east-1
-source_ami: debian-12-*
-subnet_ids:
-  - subnet-12345
-instance_types:
-  - t3.micro
-""")
-        setup_file.write_text("#!/bin/bash\necho 'Hello'")
+        config_file, setup_file = create_test_files(tmp_path)
         with patch("orfmi.cli.AmiBuilder") as mock_builder:
             mock_instance = MagicMock()
             mock_instance.build.side_effect = RuntimeError("Build failed")

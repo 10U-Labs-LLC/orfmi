@@ -1,12 +1,39 @@
 """Unit tests for builder module."""
 
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from orfmi.builder import AmiBuilder, BuildContext, BuildState
 from orfmi.config import AmiConfig
+
+
+def make_test_config() -> AmiConfig:
+    """Create a test AmiConfig."""
+    return AmiConfig(
+        ami_name="test-ami",
+        region="us-east-1",
+        source_ami="ami-12345",
+        subnet_ids=["subnet-1"],
+        instance_types=["t3.micro"],
+    )
+
+
+def setup_build_mocks(mocks: dict[str, MagicMock]) -> MagicMock:
+    """Configure common mock return values for build tests."""
+    mock_ec2 = MagicMock()
+    mocks["ec2_client"].return_value = mock_ec2
+    mocks["unique_id"].return_value = "abc12345"
+    mocks["get_vpc"].return_value = "vpc-12345"
+    mocks["create_key"].return_value = "private-key"
+    mocks["create_sg"].return_value = "sg-12345"
+    mocks["lookup"].return_value = "ami-source"
+    mocks["create_fleet"].return_value = "i-12345"
+    mocks["wait"].return_value = "1.2.3.4"
+    mocks["create_ami"].return_value = "ami-result"
+    return mock_ec2
 
 
 @pytest.mark.unit
@@ -35,13 +62,7 @@ class TestBuildContext:
     def test_all_values(self, tmp_path: Path) -> None:
         """Test all values."""
         ec2 = MagicMock()
-        config = AmiConfig(
-            ami_name="test-ami",
-            region="us-east-1",
-            source_ami="ami-12345",
-            subnet_ids=["subnet-1"],
-            instance_types=["t3.micro"],
-        )
+        config = make_test_config()
         setup_script = tmp_path / "setup.sh"
         ctx = BuildContext(
             ec2=ec2,
@@ -63,13 +84,7 @@ class TestAmiBuilder:
 
     def test_init(self, tmp_path: Path) -> None:
         """Test AmiBuilder initialization."""
-        config = AmiConfig(
-            ami_name="test-ami",
-            region="us-east-1",
-            source_ami="ami-12345",
-            subnet_ids=["subnet-1"],
-            instance_types=["t3.micro"],
-        )
+        config = make_test_config()
         setup_script = tmp_path / "setup.sh"
         builder = AmiBuilder(config, setup_script)
         assert builder.config == config
@@ -78,13 +93,7 @@ class TestAmiBuilder:
 
     def test_init_with_extra_files(self, tmp_path: Path) -> None:
         """Test AmiBuilder initialization with extra files."""
-        config = AmiConfig(
-            ami_name="test-ami",
-            region="us-east-1",
-            source_ami="ami-12345",
-            subnet_ids=["subnet-1"],
-            instance_types=["t3.micro"],
-        )
+        config = make_test_config()
         setup_script = tmp_path / "setup.sh"
         extra_files = [tmp_path / "file1.txt", tmp_path / "file2.txt"]
         builder = AmiBuilder(config, setup_script, extra_files)
@@ -125,28 +134,21 @@ class TestAmiBuilder:
         tmp_path: Path,
     ) -> None:
         """Test successful build."""
-        mock_ec2 = MagicMock()
-        mock_ec2_client.return_value = mock_ec2
-        mock_unique_id.return_value = "abc12345"
-        mock_get_vpc.return_value = "vpc-12345"
-        mock_create_key.return_value = "private-key"
-        mock_create_sg.return_value = "sg-12345"
-        mock_lookup.return_value = "ami-source"
-        mock_create_fleet.return_value = "i-12345"
-        mock_wait.return_value = "1.2.3.4"
-        mock_create_ami.return_value = "ami-result"
+        setup_build_mocks({
+            "ec2_client": mock_ec2_client,
+            "unique_id": mock_unique_id,
+            "get_vpc": mock_get_vpc,
+            "create_key": mock_create_key,
+            "create_sg": mock_create_sg,
+            "lookup": mock_lookup,
+            "create_fleet": mock_create_fleet,
+            "wait": mock_wait,
+            "create_ami": mock_create_ami,
+        })
 
-        config = AmiConfig(
-            ami_name="test-ami",
-            region="us-east-1",
-            source_ami="ami-12345",
-            subnet_ids=["subnet-1"],
-            instance_types=["t3.micro"],
-        )
         setup_script = tmp_path / "setup.sh"
         setup_script.write_text("#!/bin/bash\necho 'Hello'")
-
-        builder = AmiBuilder(config, setup_script)
+        builder = AmiBuilder(make_test_config(), setup_script)
         result = builder.build()
 
         assert result == "ami-result"
@@ -197,17 +199,9 @@ class TestAmiBuilder:
         mock_lookup.return_value = "ami-source"
         mock_create_fleet.side_effect = RuntimeError("Fleet creation failed")
 
-        config = AmiConfig(
-            ami_name="test-ami",
-            region="us-east-1",
-            source_ami="ami-12345",
-            subnet_ids=["subnet-1"],
-            instance_types=["t3.micro"],
-        )
         setup_script = tmp_path / "setup.sh"
         setup_script.write_text("#!/bin/bash\necho 'Hello'")
-
-        builder = AmiBuilder(config, setup_script)
+        builder = AmiBuilder(make_test_config(), setup_script)
 
         with pytest.raises(RuntimeError):
             builder.build()
@@ -248,27 +242,20 @@ class TestAmiBuilder:
         tmp_path: Path,
     ) -> None:
         """Test that setup script is skipped if it doesn't exist."""
-        mock_ec2 = MagicMock()
-        mock_ec2_client.return_value = mock_ec2
-        mock_unique_id.return_value = "abc12345"
-        mock_get_vpc.return_value = "vpc-12345"
-        mock_create_key.return_value = "private-key"
-        mock_create_sg.return_value = "sg-12345"
-        mock_lookup.return_value = "ami-source"
-        mock_create_fleet.return_value = "i-12345"
-        mock_wait.return_value = "1.2.3.4"
-        mock_create_ami.return_value = "ami-result"
+        setup_build_mocks({
+            "ec2_client": mock_ec2_client,
+            "unique_id": mock_unique_id,
+            "get_vpc": mock_get_vpc,
+            "create_key": mock_create_key,
+            "create_sg": mock_create_sg,
+            "lookup": mock_lookup,
+            "create_fleet": mock_create_fleet,
+            "wait": mock_wait,
+            "create_ami": mock_create_ami,
+        })
 
-        config = AmiConfig(
-            ami_name="test-ami",
-            region="us-east-1",
-            source_ami="ami-12345",
-            subnet_ids=["subnet-1"],
-            instance_types=["t3.micro"],
-        )
         setup_script = tmp_path / "nonexistent.sh"
-
-        builder = AmiBuilder(config, setup_script)
+        builder = AmiBuilder(make_test_config(), setup_script)
         result = builder.build()
 
         assert result == "ami-result"
