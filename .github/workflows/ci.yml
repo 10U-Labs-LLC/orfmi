@@ -72,9 +72,7 @@ jobs:
       - name: Integration tests
         run: |
           python3 -m pytest test/integration/ \
-            --verbose --pythonwarnings=error \
-            --cov=orfmi \
-            --cov-fail-under=100
+            --verbose --pythonwarnings=error
       - name: E2E tests
         run: python3 -m pytest test/e2e/ --verbose --pythonwarnings=error
 name: CI

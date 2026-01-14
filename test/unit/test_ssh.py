@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from orfmi.ssh import SshConfig, connect_ssh, run_setup_script, upload_file
+from orfmi.ssh import SshConfig, connect_ssh, run_setup_script, run_ssh_command, upload_file
 
 
 @pytest.mark.unit
@@ -213,3 +213,79 @@ class TestRunSetupScript:
         )
         run_setup_script(config, setup_script, [extra_file])
         assert mock_sftp.put.call_count == 2
+
+
+@pytest.mark.unit
+class TestRunSshCommand:
+    """Tests for run_ssh_command function."""
+
+    @patch("time.sleep")
+    @patch("sys.stdout")
+    def test_runs_command_success(
+        self,
+        _mock_stdout: MagicMock,
+        _mock_sleep: MagicMock,
+        ssh_command_channel: dict[str, Any],
+    ) -> None:
+        """Test successful command execution."""
+        client = ssh_command_channel["client"]
+        channel = ssh_command_channel["channel"]
+        channel.exit_status_ready.side_effect = [False, True]
+        channel.recv_ready.side_effect = [True, False]
+        channel.recv.return_value = b"output"
+        channel.recv_exit_status.return_value = 0
+        run_ssh_command(client, "echo test")
+        assert client.exec_command.call_count == 1
+
+    @patch("time.sleep")
+    @patch("sys.stdout")
+    def test_raises_on_nonzero_exit(
+        self,
+        _mock_stdout: MagicMock,
+        _mock_sleep: MagicMock,
+        ssh_command_channel: dict[str, Any],
+    ) -> None:
+        """Test that RuntimeError is raised on nonzero exit code."""
+        client = ssh_command_channel["client"]
+        channel = ssh_command_channel["channel"]
+        channel.exit_status_ready.return_value = True
+        channel.recv_ready.return_value = False
+        channel.recv_exit_status.return_value = 1
+        with pytest.raises(RuntimeError, match="exit code 1"):
+            run_ssh_command(client, "false")
+
+    @patch("time.sleep")
+    @patch("sys.stdout")
+    def test_streams_output(
+        self,
+        mock_stdout: MagicMock,
+        _mock_sleep: MagicMock,
+        ssh_command_channel: dict[str, Any],
+    ) -> None:
+        """Test that output is streamed to stdout."""
+        client = ssh_command_channel["client"]
+        channel = ssh_command_channel["channel"]
+        channel.exit_status_ready.side_effect = [False, True]
+        channel.recv_ready.side_effect = [True, False]
+        channel.recv.return_value = b"test output"
+        channel.recv_exit_status.return_value = 0
+        run_ssh_command(client, "echo test")
+        assert mock_stdout.write.called
+
+    @patch("time.sleep")
+    @patch("sys.stdout")
+    def test_drains_remaining_output(
+        self,
+        mock_stdout: MagicMock,
+        _mock_sleep: MagicMock,
+        ssh_command_channel: dict[str, Any],
+    ) -> None:
+        """Test that remaining output is drained after exit status ready."""
+        client = ssh_command_channel["client"]
+        channel = ssh_command_channel["channel"]
+        channel.exit_status_ready.return_value = True
+        channel.recv_ready.side_effect = [True, False]
+        channel.recv.return_value = b"remaining output"
+        channel.recv_exit_status.return_value = 0
+        run_ssh_command(client, "echo test")
+        assert mock_stdout.write.call_count >= 1

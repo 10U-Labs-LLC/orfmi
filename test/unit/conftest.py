@@ -82,3 +82,14 @@ def create_ami_with_tags_mocks() -> dict[str, Any]:
     }
     create_ami(ec2, "i-12345", "test-ami", "Test AMI", {"Name": "test"})
     return {"ec2": ec2, "waiter": waiter}
+
+
+@pytest.fixture
+def ssh_command_channel() -> dict[str, Any]:
+    """Create channel mock for SSH command tests."""
+    client = MagicMock()
+    channel = MagicMock()
+    stdout = MagicMock()
+    stdout.channel = channel
+    client.exec_command.return_value = (None, stdout, None)
+    return {"client": client, "channel": channel, "stdout": stdout}

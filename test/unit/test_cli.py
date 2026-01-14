@@ -247,3 +247,14 @@ class TestMain:
                 "--setup-file", str(setup_file),
             ])
             assert exit_code == EXIT_FAILURE
+
+    def test_file_not_found_from_load_config(self, tmp_path: Path) -> None:
+        """Test exit code when load_config raises FileNotFoundError."""
+        config_file, setup_file = create_test_files(tmp_path)
+        with patch("orfmi.cli.load_config") as mock_load:
+            mock_load.side_effect = FileNotFoundError("File disappeared")
+            exit_code = run_main_with_args([
+                "--config-file", str(config_file),
+                "--setup-file", str(setup_file),
+            ])
+            assert exit_code == EXIT_ERROR

@@ -10,6 +10,7 @@ from orfmi.ec2 import (
     FleetConfig,
     LaunchTemplateParams,
     create_ami,
+    create_ec2_client,
     create_fleet_instance,
     create_key_pair,
     create_launch_template,
@@ -418,3 +419,44 @@ class TestGenerateUniqueId:
         """Test that IDs have correct length."""
         unique_id = generate_unique_id()
         assert len(unique_id) == 8
+
+
+@pytest.mark.unit
+class TestSecurityGroupWithTagsAndRetry:
+    """Tests for create_security_group with tags and retry behavior."""
+
+    def test_creates_security_group_with_tags(self) -> None:
+        """Test security group creation with tags creates tag specs."""
+        ec2 = MagicMock()
+        ec2.create_security_group.return_value = {"GroupId": "sg-12345"}
+        create_security_group(ec2, "vpc-12345", "test-sg", {"Name": "test"}, "linux")
+        call_kwargs = ec2.create_security_group.call_args.kwargs
+        assert call_kwargs["TagSpecifications"][0]["ResourceType"] == "security-group"
+
+    def test_logs_warning_after_max_retries(self) -> None:
+        """Test that warning is logged after all retries fail."""
+        ec2 = MagicMock()
+        ec2.delete_security_group.side_effect = ClientError(
+            {"Error": {"Code": "DependencyViolation"}}, "DeleteSecurityGroup"
+        )
+        with patch("time.sleep"):
+            delete_security_group(ec2, "sg-12345")
+        assert ec2.delete_security_group.call_count == 12
+
+
+@pytest.mark.unit
+class TestCreateEc2Client:
+    """Tests for create_ec2_client function."""
+
+    @patch("orfmi.ec2.boto3.client")
+    def test_creates_client(self, mock_client: MagicMock) -> None:
+        """Test that EC2 client is created."""
+        mock_client.return_value = MagicMock()
+        result = create_ec2_client("us-east-1")
+        assert result is not None
+
+    @patch("orfmi.ec2.boto3.client")
+    def test_passes_region(self, mock_client: MagicMock) -> None:
+        """Test that region is passed to boto3.client."""
+        create_ec2_client("us-west-2")
+        assert mock_client.call_args.kwargs["region_name"] == "us-west-2"

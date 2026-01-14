@@ -261,3 +261,36 @@ class TestAmiBuilder:
         builder = AmiBuilder(make_test_config(), setup_script)
         result = builder.build()
         assert result == builder_mocks["create_ami"].return_value
+
+    def test_raises_when_no_ami_result(
+        self, tmp_path: Path, builder_mocks: dict[str, Any]
+    ) -> None:
+        """Test that RuntimeError is raised when no AMI ID is returned."""
+        builder_mocks["create_ami"].return_value = None
+        setup_script = tmp_path / "setup.sh"
+        setup_script.write_text("#!/bin/bash\necho 'Hello'")
+        builder = AmiBuilder(make_test_config(), setup_script)
+        with pytest.raises(RuntimeError, match="no AMI ID returned"):
+            builder.build()
+
+    def test_raises_when_no_instance_id(
+        self, tmp_path: Path, builder_mocks: dict[str, Any]
+    ) -> None:
+        """Test that RuntimeError is raised when instance ID is not set."""
+        builder_mocks["create_fleet"].return_value = None
+        setup_script = tmp_path / "setup.sh"
+        setup_script.write_text("#!/bin/bash\necho 'Hello'")
+        builder = AmiBuilder(make_test_config(), setup_script)
+        with pytest.raises(RuntimeError, match="Instance ID not set"):
+            builder.build()
+
+    def test_raises_when_no_key_material(
+        self, tmp_path: Path, builder_mocks: dict[str, Any]
+    ) -> None:
+        """Test that RuntimeError is raised when key material is not set."""
+        builder_mocks["create_key"].return_value = None
+        setup_script = tmp_path / "setup.sh"
+        setup_script.write_text("#!/bin/bash\necho 'Hello'")
+        builder = AmiBuilder(make_test_config(), setup_script)
+        with pytest.raises(RuntimeError, match="Key material not set"):
+            builder.build()

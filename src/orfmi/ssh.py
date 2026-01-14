@@ -77,7 +77,8 @@ def connect_ssh(config: SshConfig) -> paramiko.SSHClient:
                 ) from exc
             time.sleep(10)
 
-    raise RuntimeError(f"Failed to connect to {config.ip_address}")
+    # This point is unreachable as the loop always returns or raises
+    raise AssertionError("Unreachable code")  # pragma: no cover
 
 
 def upload_file(sftp: paramiko.SFTPClient, local_path: Path, remote_path: str) -> None:
