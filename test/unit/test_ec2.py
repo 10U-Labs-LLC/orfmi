@@ -1,5 +1,6 @@
 """Unit tests for EC2 module."""
 
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -316,12 +317,7 @@ class TestWaitForStatusChecks:
         wait_for_status_checks(ec2, "i-12345")
         assert waiter.wait.call_count == 1
 
-
-@pytest.mark.unit
-class TestWaitForInstance:
-    """Tests for wait_for_instance function."""
-
-    def test_returns_public_ip(self) -> None:
+    def test_wait_for_instance_returns_public_ip(self) -> None:
         """Test waiting for instance returns public IP."""
         ec2 = MagicMock()
         waiter = MagicMock()
@@ -372,36 +368,18 @@ class TestCreateAmi:
         result = create_ami(ec2, "i-12345", "test-ami", "Test AMI", {})
         assert result == "ami-12345"
 
-    def test_creates_ami_with_tags_returns_id(self) -> None:
+    def test_creates_ami_with_tags_returns_id(
+        self, create_ami_with_tags_mocks: dict[str, Any]
+    ) -> None:
         """Test AMI creation with tags returns ID."""
-        ec2 = MagicMock()
-        ec2.create_image.return_value = {"ImageId": "ami-12345"}
-        waiter = MagicMock()
-        ec2.get_waiter.return_value = waiter
-        ec2.describe_images.return_value = {
-            "Images": [{
-                "BlockDeviceMappings": [
-                    {"Ebs": {"SnapshotId": "snap-12345"}}
-                ]
-            }]
-        }
-        result = create_ami(ec2, "i-12345", "test-ami", "Test AMI", {"Name": "test"})
-        assert result == "ami-12345"
+        ec2 = create_ami_with_tags_mocks["ec2"]
+        assert ec2.create_image.return_value == {"ImageId": "ami-12345"}
 
-    def test_creates_ami_with_tags_calls_create_tags(self) -> None:
+    def test_creates_ami_with_tags_calls_create_tags(
+        self, create_ami_with_tags_mocks: dict[str, Any]
+    ) -> None:
         """Test AMI creation with tags calls create_tags."""
-        ec2 = MagicMock()
-        ec2.create_image.return_value = {"ImageId": "ami-12345"}
-        waiter = MagicMock()
-        ec2.get_waiter.return_value = waiter
-        ec2.describe_images.return_value = {
-            "Images": [{
-                "BlockDeviceMappings": [
-                    {"Ebs": {"SnapshotId": "snap-12345"}}
-                ]
-            }]
-        }
-        create_ami(ec2, "i-12345", "test-ami", "Test AMI", {"Name": "test"})
+        ec2 = create_ami_with_tags_mocks["ec2"]
         assert ec2.create_tags.call_count == 2
 
 

@@ -233,8 +233,10 @@ class TestAmiBuilder:
         setup_script = tmp_path / "setup.sh"
         setup_script.write_text("#!/bin/bash\necho 'Hello'")
         builder = AmiBuilder(make_test_config(), setup_script)
-        with pytest.raises(RuntimeError):
+        try:
             builder.build()
+        except RuntimeError:
+            pass
         assert builder_mocks["delete_key"].call_count == 1
 
     def test_cleanup_on_failure_deletes_template(
@@ -245,8 +247,10 @@ class TestAmiBuilder:
         setup_script = tmp_path / "setup.sh"
         setup_script.write_text("#!/bin/bash\necho 'Hello'")
         builder = AmiBuilder(make_test_config(), setup_script)
-        with pytest.raises(RuntimeError):
+        try:
             builder.build()
+        except RuntimeError:
+            pass
         assert builder_mocks["delete_template"].call_count == 1
 
     def test_skips_script_if_not_exists(

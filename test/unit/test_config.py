@@ -92,11 +92,6 @@ class TestAmiConfigAllFields:
         """Test platform is set correctly."""
         assert full_config.platform == "windows"
 
-
-@pytest.mark.unit
-class TestAmiConfigFrozen:
-    """Tests for AmiConfig immutability."""
-
     def test_frozen(self, minimal_config: AmiConfig) -> None:
         """Test that config is immutable."""
         with pytest.raises(AttributeError):
@@ -163,6 +158,22 @@ class TestLoadConfigFull:
     def test_tags(self, loaded_full_config: AmiConfig) -> None:
         """Test tags are loaded correctly."""
         assert loaded_full_config.tags == {"Name": "test", "Environment": "dev"}
+
+    def test_windows_platform(self, tmp_path: Path) -> None:
+        """Test that windows platform is accepted."""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text("""
+ami_name: test-ami
+region: us-east-1
+source_ami: ami-12345
+subnet_ids:
+  - subnet-1
+instance_types:
+  - t3.micro
+platform: windows
+""")
+        config = load_config(config_file)
+        assert config.platform == "windows"
 
 
 @pytest.mark.unit
@@ -259,24 +270,3 @@ tags:
         config_file.write_text("- item1\n- item2")
         with pytest.raises(ConfigError, match="Configuration must be a YAML mapping"):
             load_config(config_file)
-
-
-@pytest.mark.unit
-class TestLoadConfigWindowsPlatform:
-    """Tests for load_config with windows platform."""
-
-    def test_windows_platform(self, tmp_path: Path) -> None:
-        """Test that windows platform is accepted."""
-        config_file = tmp_path / "config.yml"
-        config_file.write_text("""
-ami_name: test-ami
-region: us-east-1
-source_ami: ami-12345
-subnet_ids:
-  - subnet-1
-instance_types:
-  - t3.micro
-platform: windows
-""")
-        config = load_config(config_file)
-        assert config.platform == "windows"

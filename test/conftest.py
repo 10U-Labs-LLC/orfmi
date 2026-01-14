@@ -99,10 +99,10 @@ def valid_args() -> list[str]:
 
 
 @pytest.fixture
-def parsed_valid_args(valid_args: list[str]) -> argparse.Namespace:
+def parsed_valid_args() -> argparse.Namespace:
     """Return parsed valid arguments."""
     parser = create_parser()
-    return parser.parse_args(valid_args)
+    return parser.parse_args(["--config-file", "config.yml", "--setup-file", "setup.sh"])
 
 
 @pytest.fixture
