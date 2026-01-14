@@ -45,7 +45,7 @@ class TestGetVpcFromSubnet:
         ec2 = MagicMock()
         ec2.describe_subnets.return_value = {"Subnets": [{"VpcId": "vpc-abc"}]}
         get_vpc_from_subnet(ec2, "subnet-xyz")
-        ec2.describe_subnets.assert_called_once_with(SubnetIds=["subnet-xyz"])
+        assert ec2.describe_subnets.call_args.kwargs == {"SubnetIds": ["subnet-xyz"]}
 
 
 @pytest.mark.unit
@@ -93,7 +93,13 @@ class TestCreateKeyPair:
         ec2.create_key_pair.return_value = {"KeyMaterial": "private-key-data"}
         result = create_key_pair(ec2, "test-key", {"Name": "test"})
         assert result == "private-key-data"
-        ec2.create_key_pair.assert_called_once()
+
+    def test_creates_key_pair_calls_api(self) -> None:
+        """Test key pair creation calls API."""
+        ec2 = MagicMock()
+        ec2.create_key_pair.return_value = {"KeyMaterial": "private-key-data"}
+        create_key_pair(ec2, "test-key", {"Name": "test"})
+        assert ec2.create_key_pair.call_count == 1
 
     def test_creates_key_pair_without_tags(self) -> None:
         """Test key pair creation without tags."""
@@ -111,7 +117,7 @@ class TestDeleteKeyPair:
         """Test successful key pair deletion."""
         ec2 = MagicMock()
         delete_key_pair(ec2, "test-key")
-        ec2.delete_key_pair.assert_called_once_with(KeyName="test-key")
+        assert ec2.delete_key_pair.call_args.kwargs == {"KeyName": "test-key"}
 
     def test_handles_error(self) -> None:
         """Test that errors are logged but not raised."""
@@ -127,22 +133,33 @@ class TestDeleteKeyPair:
 class TestCreateSecurityGroup:
     """Tests for create_security_group function."""
 
-    def test_creates_linux_security_group(self) -> None:
-        """Test security group creation for Linux (SSH)."""
+    def test_creates_linux_security_group_returns_id(self) -> None:
+        """Test security group creation for Linux returns ID."""
         ec2 = MagicMock()
         ec2.create_security_group.return_value = {"GroupId": "sg-12345"}
         result = create_security_group(ec2, "vpc-12345", "test-sg", {}, "linux")
         assert result == "sg-12345"
-        ec2.authorize_security_group_ingress.assert_called_once()
+
+    def test_creates_linux_security_group_uses_ssh_port(self) -> None:
+        """Test security group creation for Linux uses SSH port."""
+        ec2 = MagicMock()
+        ec2.create_security_group.return_value = {"GroupId": "sg-12345"}
+        create_security_group(ec2, "vpc-12345", "test-sg", {}, "linux")
         call_kwargs = ec2.authorize_security_group_ingress.call_args.kwargs
         assert call_kwargs["IpPermissions"][0]["FromPort"] == 22
 
-    def test_creates_windows_security_group(self) -> None:
-        """Test security group creation for Windows (RDP)."""
+    def test_creates_windows_security_group_returns_id(self) -> None:
+        """Test security group creation for Windows returns ID."""
         ec2 = MagicMock()
         ec2.create_security_group.return_value = {"GroupId": "sg-12345"}
         result = create_security_group(ec2, "vpc-12345", "test-sg", {}, "windows")
         assert result == "sg-12345"
+
+    def test_creates_windows_security_group_uses_rdp_port(self) -> None:
+        """Test security group creation for Windows uses RDP port."""
+        ec2 = MagicMock()
+        ec2.create_security_group.return_value = {"GroupId": "sg-12345"}
+        create_security_group(ec2, "vpc-12345", "test-sg", {}, "windows")
         call_kwargs = ec2.authorize_security_group_ingress.call_args.kwargs
         assert call_kwargs["IpPermissions"][0]["FromPort"] == 3389
 
@@ -155,7 +172,7 @@ class TestDeleteSecurityGroup:
         """Test successful security group deletion."""
         ec2 = MagicMock()
         delete_security_group(ec2, "sg-12345")
-        ec2.delete_security_group.assert_called_once_with(GroupId="sg-12345")
+        assert ec2.delete_security_group.call_args.kwargs == {"GroupId": "sg-12345"}
 
     def test_retries_on_failure(self) -> None:
         """Test that deletion is retried on failure."""
@@ -184,7 +201,7 @@ class TestCreateLaunchTemplate:
             iam_profile="test-profile",
         )
         create_launch_template(ec2, params, {"Name": "test"})
-        ec2.create_launch_template.assert_called_once()
+        assert ec2.create_launch_template.call_count == 1
 
     def test_creates_template_without_iam_profile(self) -> None:
         """Test launch template creation without IAM profile."""
@@ -197,7 +214,7 @@ class TestCreateLaunchTemplate:
             iam_profile=None,
         )
         create_launch_template(ec2, params, {})
-        ec2.create_launch_template.assert_called_once()
+        assert ec2.create_launch_template.call_count == 1
 
 
 @pytest.mark.unit
@@ -208,7 +225,7 @@ class TestDeleteLaunchTemplate:
         """Test successful template deletion."""
         ec2 = MagicMock()
         delete_launch_template(ec2, "test-template")
-        ec2.delete_launch_template.assert_called_once()
+        assert ec2.delete_launch_template.call_count == 1
 
     def test_handles_error(self) -> None:
         """Test that errors are silently ignored."""
@@ -259,29 +276,53 @@ class TestCreateFleetInstance:
 
 
 @pytest.mark.unit
-class TestWaitFunctions:
-    """Tests for wait functions."""
+class TestWaitForInstanceRunning:
+    """Tests for wait_for_instance_running function."""
 
-    def test_wait_for_instance_running(self) -> None:
-        """Test waiting for instance to be running."""
+    def test_calls_get_waiter(self) -> None:
+        """Test that get_waiter is called with correct waiter name."""
         ec2 = MagicMock()
         waiter = MagicMock()
         ec2.get_waiter.return_value = waiter
         wait_for_instance_running(ec2, "i-12345")
-        ec2.get_waiter.assert_called_once_with("instance_running")
-        waiter.wait.assert_called_once()
+        assert ec2.get_waiter.call_args[0][0] == "instance_running"
 
-    def test_wait_for_status_checks(self) -> None:
-        """Test waiting for status checks."""
+    def test_calls_waiter_wait(self) -> None:
+        """Test that waiter.wait is called."""
+        ec2 = MagicMock()
+        waiter = MagicMock()
+        ec2.get_waiter.return_value = waiter
+        wait_for_instance_running(ec2, "i-12345")
+        assert waiter.wait.call_count == 1
+
+
+@pytest.mark.unit
+class TestWaitForStatusChecks:
+    """Tests for wait_for_status_checks function."""
+
+    def test_calls_get_waiter(self) -> None:
+        """Test that get_waiter is called with correct waiter name."""
         ec2 = MagicMock()
         waiter = MagicMock()
         ec2.get_waiter.return_value = waiter
         wait_for_status_checks(ec2, "i-12345")
-        ec2.get_waiter.assert_called_once_with("instance_status_ok")
-        waiter.wait.assert_called_once()
+        assert ec2.get_waiter.call_args[0][0] == "instance_status_ok"
 
-    def test_wait_for_instance(self) -> None:
-        """Test waiting for instance to be ready."""
+    def test_calls_waiter_wait(self) -> None:
+        """Test that waiter.wait is called."""
+        ec2 = MagicMock()
+        waiter = MagicMock()
+        ec2.get_waiter.return_value = waiter
+        wait_for_status_checks(ec2, "i-12345")
+        assert waiter.wait.call_count == 1
+
+
+@pytest.mark.unit
+class TestWaitForInstance:
+    """Tests for wait_for_instance function."""
+
+    def test_returns_public_ip(self) -> None:
+        """Test waiting for instance returns public IP."""
         ec2 = MagicMock()
         waiter = MagicMock()
         ec2.get_waiter.return_value = waiter
@@ -312,15 +353,15 @@ class TestGetInstancePublicIp:
             "Reservations": [{"Instances": [{"PublicIpAddress": "5.6.7.8"}]}]
         }
         get_instance_public_ip(ec2, "i-abc123")
-        ec2.describe_instances.assert_called_once_with(InstanceIds=["i-abc123"])
+        assert ec2.describe_instances.call_args.kwargs == {"InstanceIds": ["i-abc123"]}
 
 
 @pytest.mark.unit
 class TestCreateAmi:
     """Tests for create_ami function."""
 
-    def test_creates_ami(self) -> None:
-        """Test AMI creation."""
+    def test_creates_ami_returns_id(self) -> None:
+        """Test AMI creation returns ID."""
         ec2 = MagicMock()
         ec2.create_image.return_value = {"ImageId": "ami-12345"}
         waiter = MagicMock()
@@ -331,8 +372,8 @@ class TestCreateAmi:
         result = create_ami(ec2, "i-12345", "test-ami", "Test AMI", {})
         assert result == "ami-12345"
 
-    def test_creates_ami_with_tags(self) -> None:
-        """Test AMI creation with tags."""
+    def test_creates_ami_with_tags_returns_id(self) -> None:
+        """Test AMI creation with tags returns ID."""
         ec2 = MagicMock()
         ec2.create_image.return_value = {"ImageId": "ami-12345"}
         waiter = MagicMock()
@@ -346,6 +387,21 @@ class TestCreateAmi:
         }
         result = create_ami(ec2, "i-12345", "test-ami", "Test AMI", {"Name": "test"})
         assert result == "ami-12345"
+
+    def test_creates_ami_with_tags_calls_create_tags(self) -> None:
+        """Test AMI creation with tags calls create_tags."""
+        ec2 = MagicMock()
+        ec2.create_image.return_value = {"ImageId": "ami-12345"}
+        waiter = MagicMock()
+        ec2.get_waiter.return_value = waiter
+        ec2.describe_images.return_value = {
+            "Images": [{
+                "BlockDeviceMappings": [
+                    {"Ebs": {"SnapshotId": "snap-12345"}}
+                ]
+            }]
+        }
+        create_ami(ec2, "i-12345", "test-ami", "Test AMI", {"Name": "test"})
         assert ec2.create_tags.call_count == 2
 
 
@@ -359,7 +415,7 @@ class TestTerminateInstance:
         waiter = MagicMock()
         ec2.get_waiter.return_value = waiter
         terminate_instance(ec2, "i-12345")
-        ec2.terminate_instances.assert_called_once_with(InstanceIds=["i-12345"])
+        assert ec2.terminate_instances.call_args.kwargs == {"InstanceIds": ["i-12345"]}
 
     def test_waits_for_termination(self) -> None:
         """Test that waiter is used for termination."""
@@ -367,7 +423,7 @@ class TestTerminateInstance:
         waiter = MagicMock()
         ec2.get_waiter.return_value = waiter
         terminate_instance(ec2, "i-abc")
-        waiter.wait.assert_called_once()
+        assert waiter.wait.call_count == 1
 
 
 @pytest.mark.unit

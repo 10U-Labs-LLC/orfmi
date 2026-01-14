@@ -1,5 +1,6 @@
 """Unit tests for CLI module."""
 
+import argparse
 import logging
 from pathlib import Path
 from test.conftest import create_test_files, run_main_with_args
@@ -39,18 +40,27 @@ class TestCreateParser:
         with pytest.raises(SystemExit):
             parser.parse_args(["--config-file", "config.yml"])
 
-    def test_valid_arguments(self) -> None:
-        """Test parsing valid arguments."""
-        parser = create_parser()
-        args = parser.parse_args([
-            "--config-file", "config.yml",
-            "--setup-file", "setup.sh",
-        ])
-        assert args.config_file == Path("config.yml")
-        assert args.setup_file == Path("setup.sh")
-        assert args.verbose is False
-        assert args.quiet is False
-        assert args.extra_files is None
+    def test_valid_arguments_config_file(self, parsed_valid_args: argparse.Namespace) -> None:
+        """Test parsing valid arguments - config_file."""
+        assert parsed_valid_args.config_file == Path("config.yml")
+
+    def test_valid_arguments_setup_file(self, parsed_valid_args: argparse.Namespace) -> None:
+        """Test parsing valid arguments - setup_file."""
+        assert parsed_valid_args.setup_file == Path("setup.sh")
+
+    def test_valid_arguments_verbose_default(self, parsed_valid_args: argparse.Namespace) -> None:
+        """Test parsing valid arguments - verbose default."""
+        assert parsed_valid_args.verbose is False
+
+    def test_valid_arguments_quiet_default(self, parsed_valid_args: argparse.Namespace) -> None:
+        """Test parsing valid arguments - quiet default."""
+        assert parsed_valid_args.quiet is False
+
+    def test_valid_arguments_extra_files_default(
+        self, parsed_valid_args: argparse.Namespace
+    ) -> None:
+        """Test parsing valid arguments - extra_files default."""
+        assert parsed_valid_args.extra_files is None
 
     def test_verbose_flag(self) -> None:
         """Test --verbose flag."""
@@ -111,15 +121,19 @@ class TestSetupLogging:
         """Test default logging level is INFO."""
         with patch("logging.basicConfig") as mock_config:
             setup_logging(verbose=False, quiet=False)
-            mock_config.assert_called_once()
             call_kwargs = mock_config.call_args.kwargs
             assert call_kwargs["level"] == logging.INFO
+
+    def test_default_calls_basic_config(self) -> None:
+        """Test default setup calls basicConfig once."""
+        with patch("logging.basicConfig") as mock_config:
+            setup_logging(verbose=False, quiet=False)
+            assert mock_config.call_count == 1
 
     def test_verbose_level(self) -> None:
         """Test verbose logging level is DEBUG."""
         with patch("logging.basicConfig") as mock_config:
             setup_logging(verbose=True, quiet=False)
-            mock_config.assert_called_once()
             call_kwargs = mock_config.call_args.kwargs
             assert call_kwargs["level"] == logging.DEBUG
 
@@ -127,7 +141,6 @@ class TestSetupLogging:
         """Test quiet logging level is ERROR."""
         with patch("logging.basicConfig") as mock_config:
             setup_logging(verbose=False, quiet=True)
-            mock_config.assert_called_once()
             call_kwargs = mock_config.call_args.kwargs
             assert call_kwargs["level"] == logging.ERROR
 
@@ -144,27 +157,33 @@ class TestValidateFiles:
         setup_file.touch()
         assert validate_files(config_file, setup_file) is True
 
-    def test_config_file_missing(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    def test_config_file_missing_returns_false(
+        self, missing_config_validation: tuple[bool, str]
     ) -> None:
-        """Test when config file is missing."""
-        config_file = tmp_path / "nonexistent.yml"
-        setup_file = tmp_path / "setup.sh"
-        setup_file.touch()
-        assert validate_files(config_file, setup_file) is False
-        captured = capsys.readouterr()
-        assert "Configuration file not found" in captured.err
+        """Test when config file is missing returns False."""
+        result, _ = missing_config_validation
+        assert result is False
 
-    def test_setup_file_missing(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    def test_config_file_missing_message(
+        self, missing_config_validation: tuple[bool, str]
     ) -> None:
-        """Test when setup file is missing."""
-        config_file = tmp_path / "config.yml"
-        setup_file = tmp_path / "nonexistent.sh"
-        config_file.touch()
-        assert validate_files(config_file, setup_file) is False
-        captured = capsys.readouterr()
-        assert "Setup file not found" in captured.err
+        """Test when config file is missing shows error message."""
+        _, stderr = missing_config_validation
+        assert "Configuration file not found" in stderr
+
+    def test_setup_file_missing_returns_false(
+        self, missing_setup_validation: tuple[bool, str]
+    ) -> None:
+        """Test when setup file is missing returns False."""
+        result, _ = missing_setup_validation
+        assert result is False
+
+    def test_setup_file_missing_message(
+        self, missing_setup_validation: tuple[bool, str]
+    ) -> None:
+        """Test when setup file is missing shows error message."""
+        _, stderr = missing_setup_validation
+        assert "Setup file not found" in stderr
 
 
 @pytest.mark.unit

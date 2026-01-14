@@ -1,12 +1,21 @@
 """Pytest configuration and shared fixtures."""
 
+import argparse
 from pathlib import Path
 from typing import Any, Generator
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from orfmi.cli import main
+from orfmi.cli import create_parser, main, validate_files
+from orfmi.config import (
+    AmiConfig,
+    AmiIdentity,
+    InstanceSettings,
+    SSHSettings,
+    load_config,
+)
+from orfmi.ssh import SshConfig
 
 
 VALID_CONFIG_YAML = """
@@ -80,3 +89,144 @@ def builder_mocks() -> Generator[dict[str, Any], None, None]:
     yield mocks
     for p in patches.values():
         p.stop()
+
+
+# CLI fixtures
+@pytest.fixture
+def valid_args() -> list[str]:
+    """Return valid argument list for parsing."""
+    return ["--config-file", "config.yml", "--setup-file", "setup.sh"]
+
+
+@pytest.fixture
+def parsed_valid_args(valid_args: list[str]) -> argparse.Namespace:
+    """Return parsed valid arguments."""
+    parser = create_parser()
+    return parser.parse_args(valid_args)
+
+
+@pytest.fixture
+def missing_config_validation(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> tuple[bool, str]:
+    """Run validate_files with missing config file."""
+    config_file = tmp_path / "nonexistent.yml"
+    setup_file = tmp_path / "setup.sh"
+    setup_file.touch()
+    result = validate_files(config_file, setup_file)
+    captured = capsys.readouterr()
+    return result, captured.err
+
+
+@pytest.fixture
+def missing_setup_validation(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> tuple[bool, str]:
+    """Run validate_files with missing setup file."""
+    config_file = tmp_path / "config.yml"
+    setup_file = tmp_path / "nonexistent.sh"
+    config_file.touch()
+    result = validate_files(config_file, setup_file)
+    captured = capsys.readouterr()
+    return result, captured.err
+
+
+# Config fixtures
+@pytest.fixture
+def minimal_config() -> AmiConfig:
+    """Create a minimal AmiConfig with defaults."""
+    ami = AmiIdentity(name="test-ami")
+    instance = InstanceSettings(subnet_ids=["subnet-1"], instance_types=["t3.micro"])
+    return AmiConfig(
+        ami=ami,
+        region="us-east-1",
+        source_ami="ami-12345",
+        instance=instance,
+    )
+
+
+@pytest.fixture
+def full_config() -> AmiConfig:
+    """Create a full AmiConfig with all fields."""
+    ami = AmiIdentity(name="test-ami", description="Test AMI")
+    ssh_settings = SSHSettings(username="ec2-user", timeout=600, retries=60)
+    instance = InstanceSettings(
+        subnet_ids=["subnet-1", "subnet-2"],
+        instance_types=["t3.micro", "t3.small"],
+        iam_instance_profile="my-profile",
+    )
+    return AmiConfig(
+        ami=ami,
+        region="us-west-2",
+        source_ami="ami-67890",
+        instance=instance,
+        tags={"Name": "test"},
+        ssh=ssh_settings,
+        platform="windows",
+    )
+
+
+@pytest.fixture
+def loaded_minimal_config(tmp_path: Path) -> AmiConfig:
+    """Load a minimal config from file."""
+    config_file = tmp_path / "config.yml"
+    config_file.write_text("""
+ami_name: test-ami
+region: us-east-1
+source_ami: debian-12-*
+subnet_ids:
+  - subnet-12345
+instance_types:
+  - t3.micro
+""")
+    return load_config(config_file)
+
+
+@pytest.fixture
+def loaded_full_config(tmp_path: Path) -> AmiConfig:
+    """Load a full config from file."""
+    config_file = tmp_path / "config.yml"
+    config_file.write_text("""
+ami_name: my-ami
+region: us-west-2
+source_ami: ubuntu-22.04-*
+subnet_ids:
+  - subnet-1
+  - subnet-2
+instance_types:
+  - t3.micro
+  - t3.small
+ami_description: My custom AMI
+iam_instance_profile: my-profile
+ssh_username: ubuntu
+ssh_timeout: 600
+ssh_retries: 60
+platform: linux
+tags:
+  Name: test
+  Environment: dev
+""")
+    return load_config(config_file)
+
+
+# SSH fixtures
+@pytest.fixture
+def default_ssh_config() -> SshConfig:
+    """Create SSH config with defaults."""
+    return SshConfig(
+        ip_address="1.2.3.4",
+        key_material="private-key",
+        username="admin",
+    )
+
+
+@pytest.fixture
+def full_ssh_config() -> SshConfig:
+    """Create SSH config with all values."""
+    return SshConfig(
+        ip_address="1.2.3.4",
+        key_material="private-key",
+        username="admin",
+        timeout=600,
+        retries=60,
+    )

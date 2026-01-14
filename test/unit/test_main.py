@@ -17,7 +17,7 @@ class TestMainModule:
         sys.modules.pop("orfmi.__main__", None)
         with patch("orfmi.cli.main") as mock_main:
             importlib.import_module("orfmi.__main__")
-            mock_main.assert_called_once()
+            assert mock_main.call_count == 1
 
     def test_module_is_importable(self) -> None:
         """Test that __main__ module can be imported."""

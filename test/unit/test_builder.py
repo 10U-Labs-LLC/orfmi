@@ -193,7 +193,7 @@ class TestAmiBuilder:
         setup_script.write_text("#!/bin/bash\necho 'Hello'")
         builder = AmiBuilder(make_test_config(), setup_script)
         builder.build()
-        builder_mocks["create_key"].assert_called_once()
+        assert builder_mocks["create_key"].call_count == 1
 
     def test_build_calls_create_sg(
         self, tmp_path: Path, builder_mocks: dict[str, Any]
@@ -203,7 +203,7 @@ class TestAmiBuilder:
         setup_script.write_text("#!/bin/bash\necho 'Hello'")
         builder = AmiBuilder(make_test_config(), setup_script)
         builder.build()
-        builder_mocks["create_sg"].assert_called_once()
+        assert builder_mocks["create_sg"].call_count == 1
 
     def test_build_calls_create_ami(
         self, tmp_path: Path, builder_mocks: dict[str, Any]
@@ -213,7 +213,7 @@ class TestAmiBuilder:
         setup_script.write_text("#!/bin/bash\necho 'Hello'")
         builder = AmiBuilder(make_test_config(), setup_script)
         builder.build()
-        builder_mocks["create_ami"].assert_called_once()
+        assert builder_mocks["create_ami"].call_count == 1
 
     def test_build_calls_terminate(
         self, tmp_path: Path, builder_mocks: dict[str, Any]
@@ -223,7 +223,7 @@ class TestAmiBuilder:
         setup_script.write_text("#!/bin/bash\necho 'Hello'")
         builder = AmiBuilder(make_test_config(), setup_script)
         builder.build()
-        builder_mocks["terminate"].assert_called_once()
+        assert builder_mocks["terminate"].call_count == 1
 
     def test_cleanup_on_failure_deletes_key(
         self, tmp_path: Path, builder_mocks: dict[str, Any]
@@ -235,7 +235,7 @@ class TestAmiBuilder:
         builder = AmiBuilder(make_test_config(), setup_script)
         with pytest.raises(RuntimeError):
             builder.build()
-        builder_mocks["delete_key"].assert_called_once()
+        assert builder_mocks["delete_key"].call_count == 1
 
     def test_cleanup_on_failure_deletes_template(
         self, tmp_path: Path, builder_mocks: dict[str, Any]
@@ -247,7 +247,7 @@ class TestAmiBuilder:
         builder = AmiBuilder(make_test_config(), setup_script)
         with pytest.raises(RuntimeError):
             builder.build()
-        builder_mocks["delete_template"].assert_called_once()
+        assert builder_mocks["delete_template"].call_count == 1
 
     def test_skips_script_if_not_exists(
         self, tmp_path: Path, builder_mocks: dict[str, Any]

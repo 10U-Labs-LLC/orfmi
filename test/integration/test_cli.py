@@ -2,11 +2,69 @@
 
 from pathlib import Path
 from test.conftest import create_test_files, run_main_with_args
+from typing import Any
 from unittest.mock import patch
 
 import pytest
 
 from orfmi.cli import EXIT_ERROR, EXIT_FAILURE, EXIT_SUCCESS
+
+
+@pytest.fixture
+def full_config_result(tmp_path: Path) -> tuple[int, Any]:
+    """Run CLI with full config and return exit code and parsed config."""
+    config_file = tmp_path / "config.yml"
+    config_file.write_text("""
+ami_name: my-custom-ami
+region: us-west-2
+source_ami: ubuntu-22.04-*
+subnet_ids:
+  - subnet-aaa
+  - subnet-bbb
+instance_types:
+  - t3.micro
+  - t3.small
+ami_description: My custom AMI for testing
+iam_instance_profile: my-profile
+ssh_username: ubuntu
+ssh_timeout: 600
+ssh_retries: 60
+platform: linux
+tags:
+  Name: test
+  Environment: dev
+""")
+    setup_file = tmp_path / "setup.sh"
+    setup_file.write_text("#!/bin/bash\necho 'Hello'")
+
+    with patch("orfmi.cli.AmiBuilder") as mock_builder:
+        mock_builder.return_value.build.return_value = "ami-12345"
+        exit_code = run_main_with_args([
+            "--config-file", str(config_file),
+            "--setup-file", str(setup_file),
+        ])
+        config = mock_builder.call_args[0][0]
+        return exit_code, config
+
+
+@pytest.fixture
+def extra_files_result(tmp_path: Path) -> tuple[int, list[Path]]:
+    """Run CLI with extra files and return exit code and extra files list."""
+    config_file, setup_file = create_test_files(tmp_path)
+    extra1 = tmp_path / "extra1.txt"
+    extra1.write_text("extra1")
+    extra2 = tmp_path / "extra2.txt"
+    extra2.write_text("extra2")
+
+    with patch("orfmi.cli.AmiBuilder") as mock_builder:
+        mock_builder.return_value.build.return_value = "ami-12345"
+        exit_code = run_main_with_args([
+            "--config-file", str(config_file),
+            "--setup-file", str(setup_file),
+            "--extra-files", str(extra1), str(extra2),
+        ])
+        extra_files = mock_builder.call_args[0][2]
+        return exit_code, extra_files
 
 
 @pytest.mark.integration
@@ -107,46 +165,47 @@ class TestCliOutput:
 class TestCliConfigParsing:
     """Integration tests for config parsing through CLI."""
 
-    def test_parses_full_config(self, tmp_path: Path) -> None:
-        """Test that full config is parsed correctly."""
-        config_file = tmp_path / "config.yml"
-        config_file.write_text("""
-ami_name: my-custom-ami
-region: us-west-2
-source_ami: ubuntu-22.04-*
-subnet_ids:
-  - subnet-aaa
-  - subnet-bbb
-instance_types:
-  - t3.micro
-  - t3.small
-ami_description: My custom AMI for testing
-iam_instance_profile: my-profile
-ssh_username: ubuntu
-ssh_timeout: 600
-ssh_retries: 60
-platform: linux
-tags:
-  Name: test
-  Environment: dev
-""")
-        setup_file = tmp_path / "setup.sh"
-        setup_file.write_text("#!/bin/bash\necho 'Hello'")
+    def test_full_config_exit_code(
+        self, full_config_result: tuple[int, Any]
+    ) -> None:
+        """Test that full config parsing returns success."""
+        exit_code, _ = full_config_result
+        assert exit_code == EXIT_SUCCESS
 
-        with patch("orfmi.cli.AmiBuilder") as mock_builder:
-            mock_builder.return_value.build.return_value = "ami-12345"
-            exit_code = run_main_with_args([
-                "--config-file", str(config_file),
-                "--setup-file", str(setup_file),
-            ])
-            assert exit_code == EXIT_SUCCESS
-            call_args = mock_builder.call_args
-            config = call_args[0][0]
-            assert config.ami.name == "my-custom-ami"
-            assert config.region == "us-west-2"
-            assert config.instance.subnet_ids == ["subnet-aaa", "subnet-bbb"]
-            assert config.instance.instance_types == ["t3.micro", "t3.small"]
-            assert config.ssh.username == "ubuntu"
+    def test_full_config_ami_name(
+        self, full_config_result: tuple[int, Any]
+    ) -> None:
+        """Test that ami_name is parsed correctly."""
+        _, config = full_config_result
+        assert config.ami.name == "my-custom-ami"
+
+    def test_full_config_region(
+        self, full_config_result: tuple[int, Any]
+    ) -> None:
+        """Test that region is parsed correctly."""
+        _, config = full_config_result
+        assert config.region == "us-west-2"
+
+    def test_full_config_subnet_ids(
+        self, full_config_result: tuple[int, Any]
+    ) -> None:
+        """Test that subnet_ids are parsed correctly."""
+        _, config = full_config_result
+        assert config.instance.subnet_ids == ["subnet-aaa", "subnet-bbb"]
+
+    def test_full_config_instance_types(
+        self, full_config_result: tuple[int, Any]
+    ) -> None:
+        """Test that instance_types are parsed correctly."""
+        _, config = full_config_result
+        assert config.instance.instance_types == ["t3.micro", "t3.small"]
+
+    def test_full_config_ssh_username(
+        self, full_config_result: tuple[int, Any]
+    ) -> None:
+        """Test that ssh_username is parsed correctly."""
+        _, config = full_config_result
+        assert config.ssh.username == "ubuntu"
 
     def test_parses_minimal_config(self, tmp_path: Path) -> None:
         """Test that minimal config is parsed correctly."""
@@ -164,25 +223,19 @@ tags:
 class TestCliExtraFiles:
     """Integration tests for extra files handling."""
 
-    def test_passes_extra_files_to_builder(self, tmp_path: Path) -> None:
-        """Test that extra files are passed to builder."""
-        config_file, setup_file = create_test_files(tmp_path)
-        extra1 = tmp_path / "extra1.txt"
-        extra1.write_text("extra1")
-        extra2 = tmp_path / "extra2.txt"
-        extra2.write_text("extra2")
+    def test_extra_files_exit_code(
+        self, extra_files_result: tuple[int, list[Path]]
+    ) -> None:
+        """Test that extra files handling returns success."""
+        exit_code, _ = extra_files_result
+        assert exit_code == EXIT_SUCCESS
 
-        with patch("orfmi.cli.AmiBuilder") as mock_builder:
-            mock_builder.return_value.build.return_value = "ami-12345"
-            exit_code = run_main_with_args([
-                "--config-file", str(config_file),
-                "--setup-file", str(setup_file),
-                "--extra-files", str(extra1), str(extra2),
-            ])
-            assert exit_code == EXIT_SUCCESS
-            call_args = mock_builder.call_args
-            extra_files = call_args[0][2]
-            assert len(extra_files) == 2
+    def test_extra_files_count(
+        self, extra_files_result: tuple[int, list[Path]]
+    ) -> None:
+        """Test that correct number of extra files are passed."""
+        _, extra_files = extra_files_result
+        assert len(extra_files) == 2
 
     def test_no_extra_files_by_default(self, tmp_path: Path) -> None:
         """Test that no extra files are passed by default."""

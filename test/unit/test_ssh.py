@@ -9,33 +9,41 @@ from orfmi.ssh import SshConfig, connect_ssh, run_setup_script, upload_file
 
 
 @pytest.mark.unit
-class TestSshConfig:
-    """Tests for SshConfig dataclass."""
+class TestSshConfigDefaults:
+    """Tests for SshConfig default values."""
 
-    def test_default_values(self) -> None:
-        """Test default values."""
-        config = SshConfig(
-            ip_address="1.2.3.4",
-            key_material="private-key",
-            username="admin",
-        )
-        assert config.timeout == 300
-        assert config.retries == 30
+    def test_timeout_default(self, default_ssh_config: SshConfig) -> None:
+        """Test timeout default value."""
+        assert default_ssh_config.timeout == 300
 
-    def test_all_values(self) -> None:
-        """Test all values."""
-        config = SshConfig(
-            ip_address="1.2.3.4",
-            key_material="private-key",
-            username="admin",
-            timeout=600,
-            retries=60,
-        )
-        assert config.ip_address == "1.2.3.4"
-        assert config.key_material == "private-key"
-        assert config.username == "admin"
-        assert config.timeout == 600
-        assert config.retries == 60
+    def test_retries_default(self, default_ssh_config: SshConfig) -> None:
+        """Test retries default value."""
+        assert default_ssh_config.retries == 30
+
+
+@pytest.mark.unit
+class TestSshConfigAllValues:
+    """Tests for SshConfig with all values set."""
+
+    def test_ip_address(self, full_ssh_config: SshConfig) -> None:
+        """Test ip_address is set correctly."""
+        assert full_ssh_config.ip_address == "1.2.3.4"
+
+    def test_key_material(self, full_ssh_config: SshConfig) -> None:
+        """Test key_material is set correctly."""
+        assert full_ssh_config.key_material == "private-key"
+
+    def test_username(self, full_ssh_config: SshConfig) -> None:
+        """Test username is set correctly."""
+        assert full_ssh_config.username == "admin"
+
+    def test_timeout(self, full_ssh_config: SshConfig) -> None:
+        """Test timeout is set correctly."""
+        assert full_ssh_config.timeout == 600
+
+    def test_retries(self, full_ssh_config: SshConfig) -> None:
+        """Test retries is set correctly."""
+        assert full_ssh_config.retries == 60
 
 
 @pytest.mark.unit
@@ -60,18 +68,36 @@ class TestConnectSsh:
         )
         result = connect_ssh(config)
         assert result == mock_client
-        mock_client.connect.assert_called_once()
+
+    @patch("orfmi.ssh.paramiko.Ed25519Key.from_private_key")
+    @patch("orfmi.ssh.paramiko.SSHClient")
+    def test_successful_connection_calls_connect(
+        self, mock_client_class: MagicMock, mock_key_class: MagicMock
+    ) -> None:
+        """Test successful SSH connection calls connect."""
+        mock_client = MagicMock()
+        mock_client_class.return_value = mock_client
+        mock_key = MagicMock()
+        mock_key_class.return_value = mock_key
+
+        config = SshConfig(
+            ip_address="1.2.3.4",
+            key_material="private-key",
+            username="admin",
+        )
+        connect_ssh(config)
+        assert mock_client.connect.call_count == 1
 
     @patch("orfmi.ssh.paramiko.Ed25519Key.from_private_key")
     @patch("orfmi.ssh.paramiko.SSHClient")
     @patch("time.sleep")
-    def test_retries_on_failure(
+    def test_retries_on_failure_returns_client(
         self,
         _mock_sleep: MagicMock,
         mock_client_class: MagicMock,
         mock_key_class: MagicMock,
     ) -> None:
-        """Test that connection is retried on failure."""
+        """Test that connection is retried on failure and returns client."""
         mock_client = MagicMock()
         mock_client_class.return_value = mock_client
         mock_key = MagicMock()
@@ -86,6 +112,30 @@ class TestConnectSsh:
         )
         result = connect_ssh(config)
         assert result == mock_client
+
+    @patch("orfmi.ssh.paramiko.Ed25519Key.from_private_key")
+    @patch("orfmi.ssh.paramiko.SSHClient")
+    @patch("time.sleep")
+    def test_retries_on_failure_call_count(
+        self,
+        _mock_sleep: MagicMock,
+        mock_client_class: MagicMock,
+        mock_key_class: MagicMock,
+    ) -> None:
+        """Test that connect is called twice on retry."""
+        mock_client = MagicMock()
+        mock_client_class.return_value = mock_client
+        mock_key = MagicMock()
+        mock_key_class.return_value = mock_key
+        mock_client.connect.side_effect = [TimeoutError, None]
+
+        config = SshConfig(
+            ip_address="1.2.3.4",
+            key_material="private-key",
+            username="admin",
+            retries=2,
+        )
+        connect_ssh(config)
         assert mock_client.connect.call_count == 2
 
     @patch("orfmi.ssh.paramiko.Ed25519Key.from_private_key")
@@ -124,7 +174,7 @@ class TestUploadFile:
         local_file = tmp_path / "test.txt"
         local_file.write_text("test content")
         upload_file(sftp, local_file, "/tmp/test.txt")
-        sftp.put.assert_called_once_with(str(local_file), "/tmp/test.txt")
+        assert sftp.put.call_args[0] == (str(local_file), "/tmp/test.txt")
 
     def test_uploads_file_calls_put(self, tmp_path: Path) -> None:
         """Test that upload_file calls sftp.put."""
@@ -141,10 +191,10 @@ class TestRunSetupScript:
 
     @patch("orfmi.ssh.connect_ssh")
     @patch("orfmi.ssh.run_ssh_command")
-    def test_runs_script(
-        self, mock_run_cmd: MagicMock, mock_connect: MagicMock, tmp_path: Path
+    def test_runs_script_calls_put(
+        self, _mock_run_cmd: MagicMock, mock_connect: MagicMock, tmp_path: Path
     ) -> None:
-        """Test running setup script."""
+        """Test running setup script calls sftp.put."""
         mock_client = MagicMock()
         mock_connect.return_value = mock_client
         mock_sftp = MagicMock()
@@ -159,11 +209,73 @@ class TestRunSetupScript:
             username="admin",
         )
         run_setup_script(config, setup_script)
+        assert mock_sftp.put.call_count == 1
 
-        mock_sftp.put.assert_called_once()
-        mock_sftp.chmod.assert_called_once()
-        mock_run_cmd.assert_called_once()
-        mock_client.close.assert_called_once()
+    @patch("orfmi.ssh.connect_ssh")
+    @patch("orfmi.ssh.run_ssh_command")
+    def test_runs_script_calls_chmod(
+        self, _mock_run_cmd: MagicMock, mock_connect: MagicMock, tmp_path: Path
+    ) -> None:
+        """Test running setup script calls sftp.chmod."""
+        mock_client = MagicMock()
+        mock_connect.return_value = mock_client
+        mock_sftp = MagicMock()
+        mock_client.open_sftp.return_value = mock_sftp
+
+        setup_script = tmp_path / "setup.sh"
+        setup_script.write_text("#!/bin/bash\necho 'Hello'")
+
+        config = SshConfig(
+            ip_address="1.2.3.4",
+            key_material="private-key",
+            username="admin",
+        )
+        run_setup_script(config, setup_script)
+        assert mock_sftp.chmod.call_count == 1
+
+    @patch("orfmi.ssh.connect_ssh")
+    @patch("orfmi.ssh.run_ssh_command")
+    def test_runs_script_calls_run_ssh_command(
+        self, mock_run_cmd: MagicMock, mock_connect: MagicMock, tmp_path: Path
+    ) -> None:
+        """Test running setup script calls run_ssh_command."""
+        mock_client = MagicMock()
+        mock_connect.return_value = mock_client
+        mock_sftp = MagicMock()
+        mock_client.open_sftp.return_value = mock_sftp
+
+        setup_script = tmp_path / "setup.sh"
+        setup_script.write_text("#!/bin/bash\necho 'Hello'")
+
+        config = SshConfig(
+            ip_address="1.2.3.4",
+            key_material="private-key",
+            username="admin",
+        )
+        run_setup_script(config, setup_script)
+        assert mock_run_cmd.call_count == 1
+
+    @patch("orfmi.ssh.connect_ssh")
+    @patch("orfmi.ssh.run_ssh_command")
+    def test_runs_script_calls_close(
+        self, _mock_run_cmd: MagicMock, mock_connect: MagicMock, tmp_path: Path
+    ) -> None:
+        """Test running setup script closes connection."""
+        mock_client = MagicMock()
+        mock_connect.return_value = mock_client
+        mock_sftp = MagicMock()
+        mock_client.open_sftp.return_value = mock_sftp
+
+        setup_script = tmp_path / "setup.sh"
+        setup_script.write_text("#!/bin/bash\necho 'Hello'")
+
+        config = SshConfig(
+            ip_address="1.2.3.4",
+            key_material="private-key",
+            username="admin",
+        )
+        run_setup_script(config, setup_script)
+        assert mock_client.close.call_count == 1
 
     @patch("orfmi.ssh.connect_ssh")
     @patch("orfmi.ssh.run_ssh_command")
@@ -187,5 +299,4 @@ class TestRunSetupScript:
             username="admin",
         )
         run_setup_script(config, setup_script, [extra_file])
-
         assert mock_sftp.put.call_count == 2

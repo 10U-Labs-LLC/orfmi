@@ -18,30 +18,22 @@ def run_cli(*args: str, cwd: Path | None = None) -> subprocess.CompletedProcess[
     )
 
 
-@pytest.mark.e2e
-class TestCliExitCodes:
-    """E2E tests for CLI exit codes."""
+@pytest.fixture
+def missing_config_result(tmp_path: Path) -> subprocess.CompletedProcess[str]:
+    """Run CLI with missing config file."""
+    setup_file = tmp_path / "setup.sh"
+    setup_file.touch()
+    return run_cli(
+        "--config-file", str(tmp_path / "nonexistent.yml"),
+        "--setup-file", str(setup_file),
+    )
 
-    def test_exit_2_missing_arguments(self) -> None:
-        """Test exit code 2 when required arguments are missing."""
-        result = run_cli()
-        assert result.returncode == 2
 
-    def test_exit_2_missing_config_file(self, tmp_path: Path) -> None:
-        """Test exit code 2 when config file doesn't exist."""
-        setup_file = tmp_path / "setup.sh"
-        setup_file.touch()
-        result = run_cli(
-            "--config-file", str(tmp_path / "nonexistent.yml"),
-            "--setup-file", str(setup_file),
-        )
-        assert result.returncode == 2
-        assert "Configuration file not found" in result.stderr
-
-    def test_exit_2_missing_setup_file(self, tmp_path: Path) -> None:
-        """Test exit code 2 when setup file doesn't exist."""
-        config_file = tmp_path / "config.yml"
-        config_file.write_text("""
+@pytest.fixture
+def missing_setup_result(tmp_path: Path) -> subprocess.CompletedProcess[str]:
+    """Run CLI with missing setup file."""
+    config_file = tmp_path / "config.yml"
+    config_file.write_text("""
 ami_name: test-ami
 region: us-east-1
 source_ami: debian-12-*
@@ -50,68 +42,49 @@ subnet_ids:
 instance_types:
   - t3.micro
 """)
-        result = run_cli(
-            "--config-file", str(config_file),
-            "--setup-file", str(tmp_path / "nonexistent.sh"),
-        )
-        assert result.returncode == 2
-        assert "Setup file not found" in result.stderr
-
-    def test_exit_2_invalid_yaml(self, tmp_path: Path) -> None:
-        """Test exit code 2 for invalid YAML."""
-        config_file = tmp_path / "config.yml"
-        config_file.write_text("invalid: yaml: :")
-        setup_file = tmp_path / "setup.sh"
-        setup_file.touch()
-        result = run_cli(
-            "--config-file", str(config_file),
-            "--setup-file", str(setup_file),
-        )
-        assert result.returncode == 2
-        assert "Invalid YAML" in result.stderr
-
-    def test_exit_2_missing_required_fields(self, tmp_path: Path) -> None:
-        """Test exit code 2 when required fields are missing."""
-        config_file = tmp_path / "config.yml"
-        config_file.write_text("ami_name: test")
-        setup_file = tmp_path / "setup.sh"
-        setup_file.touch()
-        result = run_cli(
-            "--config-file", str(config_file),
-            "--setup-file", str(setup_file),
-        )
-        assert result.returncode == 2
-        assert "Missing required fields" in result.stderr
+    return run_cli(
+        "--config-file", str(config_file),
+        "--setup-file", str(tmp_path / "nonexistent.sh"),
+    )
 
 
-@pytest.mark.e2e
-class TestCliHelp:
-    """E2E tests for CLI help."""
-
-    def test_help_flag(self) -> None:
-        """Test --help flag shows usage."""
-        result = run_cli("--help")
-        assert result.returncode == 0
-        assert "Open Rainforest Machine Image" in result.stdout
-        assert "--config-file" in result.stdout
-        assert "--setup-file" in result.stdout
-
-    def test_help_shows_all_options(self) -> None:
-        """Test that help shows all options."""
-        result = run_cli("--help")
-        assert "--extra-files" in result.stdout
-        assert "--verbose" in result.stdout
-        assert "--quiet" in result.stdout
+@pytest.fixture
+def invalid_yaml_result(tmp_path: Path) -> subprocess.CompletedProcess[str]:
+    """Run CLI with invalid YAML config."""
+    config_file = tmp_path / "config.yml"
+    config_file.write_text("invalid: yaml: :")
+    setup_file = tmp_path / "setup.sh"
+    setup_file.touch()
+    return run_cli(
+        "--config-file", str(config_file),
+        "--setup-file", str(setup_file),
+    )
 
 
-@pytest.mark.e2e
-class TestConfigValidation:
-    """E2E tests for configuration validation."""
+@pytest.fixture
+def missing_fields_result(tmp_path: Path) -> subprocess.CompletedProcess[str]:
+    """Run CLI with missing required fields."""
+    config_file = tmp_path / "config.yml"
+    config_file.write_text("ami_name: test")
+    setup_file = tmp_path / "setup.sh"
+    setup_file.touch()
+    return run_cli(
+        "--config-file", str(config_file),
+        "--setup-file", str(setup_file),
+    )
 
-    def test_invalid_platform(self, tmp_path: Path) -> None:
-        """Test error for invalid platform."""
-        config_file = tmp_path / "config.yml"
-        config_file.write_text("""
+
+@pytest.fixture
+def help_result() -> subprocess.CompletedProcess[str]:
+    """Run CLI with --help flag."""
+    return run_cli("--help")
+
+
+@pytest.fixture
+def invalid_platform_result(tmp_path: Path) -> subprocess.CompletedProcess[str]:
+    """Run CLI with invalid platform."""
+    config_file = tmp_path / "config.yml"
+    config_file.write_text("""
 ami_name: test-ami
 region: us-east-1
 source_ami: debian-12-*
@@ -121,19 +94,19 @@ instance_types:
   - t3.micro
 platform: macos
 """)
-        setup_file = tmp_path / "setup.sh"
-        setup_file.touch()
-        result = run_cli(
-            "--config-file", str(config_file),
-            "--setup-file", str(setup_file),
-        )
-        assert result.returncode == 2
-        assert "Invalid platform" in result.stderr
+    setup_file = tmp_path / "setup.sh"
+    setup_file.touch()
+    return run_cli(
+        "--config-file", str(config_file),
+        "--setup-file", str(setup_file),
+    )
 
-    def test_empty_subnet_ids(self, tmp_path: Path) -> None:
-        """Test error for empty subnet_ids."""
-        config_file = tmp_path / "config.yml"
-        config_file.write_text("""
+
+@pytest.fixture
+def empty_subnets_result(tmp_path: Path) -> subprocess.CompletedProcess[str]:
+    """Run CLI with empty subnet_ids."""
+    config_file = tmp_path / "config.yml"
+    config_file.write_text("""
 ami_name: test-ami
 region: us-east-1
 source_ami: debian-12-*
@@ -141,19 +114,19 @@ subnet_ids: []
 instance_types:
   - t3.micro
 """)
-        setup_file = tmp_path / "setup.sh"
-        setup_file.touch()
-        result = run_cli(
-            "--config-file", str(config_file),
-            "--setup-file", str(setup_file),
-        )
-        assert result.returncode == 2
-        assert "subnet_ids must be a non-empty list" in result.stderr
+    setup_file = tmp_path / "setup.sh"
+    setup_file.touch()
+    return run_cli(
+        "--config-file", str(config_file),
+        "--setup-file", str(setup_file),
+    )
 
-    def test_empty_instance_types(self, tmp_path: Path) -> None:
-        """Test error for empty instance_types."""
-        config_file = tmp_path / "config.yml"
-        config_file.write_text("""
+
+@pytest.fixture
+def empty_instance_types_result(tmp_path: Path) -> subprocess.CompletedProcess[str]:
+    """Run CLI with empty instance_types."""
+    config_file = tmp_path / "config.yml"
+    config_file.write_text("""
 ami_name: test-ami
 region: us-east-1
 source_ami: debian-12-*
@@ -161,37 +134,190 @@ subnet_ids:
   - subnet-12345
 instance_types: []
 """)
-        setup_file = tmp_path / "setup.sh"
-        setup_file.touch()
-        result = run_cli(
-            "--config-file", str(config_file),
-            "--setup-file", str(setup_file),
-        )
+    setup_file = tmp_path / "setup.sh"
+    setup_file.touch()
+    return run_cli(
+        "--config-file", str(config_file),
+        "--setup-file", str(setup_file),
+    )
+
+
+@pytest.fixture
+def module_help_result() -> subprocess.CompletedProcess[str]:
+    """Run python -m orfmi --help."""
+    return subprocess.run(
+        [sys.executable, "-m", "orfmi", "--help"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+@pytest.mark.e2e
+class TestCliExitCodes:
+    """E2E tests for CLI exit codes."""
+
+    def test_exit_2_missing_arguments(self) -> None:
+        """Test exit code 2 when required arguments are missing."""
+        result = run_cli()
         assert result.returncode == 2
-        assert "instance_types must be a non-empty list" in result.stderr
+
+    def test_exit_2_missing_config_file(
+        self, missing_config_result: subprocess.CompletedProcess[str]
+    ) -> None:
+        """Test exit code 2 when config file doesn't exist."""
+        assert missing_config_result.returncode == 2
+
+    def test_missing_config_file_message(
+        self, missing_config_result: subprocess.CompletedProcess[str]
+    ) -> None:
+        """Test error message when config file doesn't exist."""
+        assert "Configuration file not found" in missing_config_result.stderr
+
+    def test_exit_2_missing_setup_file(
+        self, missing_setup_result: subprocess.CompletedProcess[str]
+    ) -> None:
+        """Test exit code 2 when setup file doesn't exist."""
+        assert missing_setup_result.returncode == 2
+
+    def test_missing_setup_file_message(
+        self, missing_setup_result: subprocess.CompletedProcess[str]
+    ) -> None:
+        """Test error message when setup file doesn't exist."""
+        assert "Setup file not found" in missing_setup_result.stderr
+
+    def test_exit_2_invalid_yaml(
+        self, invalid_yaml_result: subprocess.CompletedProcess[str]
+    ) -> None:
+        """Test exit code 2 for invalid YAML."""
+        assert invalid_yaml_result.returncode == 2
+
+    def test_invalid_yaml_message(
+        self, invalid_yaml_result: subprocess.CompletedProcess[str]
+    ) -> None:
+        """Test error message for invalid YAML."""
+        assert "Invalid YAML" in invalid_yaml_result.stderr
+
+    def test_exit_2_missing_required_fields(
+        self, missing_fields_result: subprocess.CompletedProcess[str]
+    ) -> None:
+        """Test exit code 2 when required fields are missing."""
+        assert missing_fields_result.returncode == 2
+
+    def test_missing_required_fields_message(
+        self, missing_fields_result: subprocess.CompletedProcess[str]
+    ) -> None:
+        """Test error message when required fields are missing."""
+        assert "Missing required fields" in missing_fields_result.stderr
+
+
+@pytest.mark.e2e
+class TestCliHelp:
+    """E2E tests for CLI help."""
+
+    def test_help_exit_code(
+        self, help_result: subprocess.CompletedProcess[str]
+    ) -> None:
+        """Test --help flag returns exit code 0."""
+        assert help_result.returncode == 0
+
+    def test_help_shows_description(
+        self, help_result: subprocess.CompletedProcess[str]
+    ) -> None:
+        """Test --help shows tool description."""
+        assert "Open Rainforest Machine Image" in help_result.stdout
+
+    def test_help_shows_config_file_option(
+        self, help_result: subprocess.CompletedProcess[str]
+    ) -> None:
+        """Test --help shows --config-file option."""
+        assert "--config-file" in help_result.stdout
+
+    def test_help_shows_setup_file_option(
+        self, help_result: subprocess.CompletedProcess[str]
+    ) -> None:
+        """Test --help shows --setup-file option."""
+        assert "--setup-file" in help_result.stdout
+
+    def test_help_shows_extra_files_option(
+        self, help_result: subprocess.CompletedProcess[str]
+    ) -> None:
+        """Test --help shows --extra-files option."""
+        assert "--extra-files" in help_result.stdout
+
+    def test_help_shows_verbose_option(
+        self, help_result: subprocess.CompletedProcess[str]
+    ) -> None:
+        """Test --help shows --verbose option."""
+        assert "--verbose" in help_result.stdout
+
+    def test_help_shows_quiet_option(
+        self, help_result: subprocess.CompletedProcess[str]
+    ) -> None:
+        """Test --help shows --quiet option."""
+        assert "--quiet" in help_result.stdout
+
+
+@pytest.mark.e2e
+class TestConfigValidation:
+    """E2E tests for configuration validation."""
+
+    def test_invalid_platform_exit_code(
+        self, invalid_platform_result: subprocess.CompletedProcess[str]
+    ) -> None:
+        """Test exit code for invalid platform."""
+        assert invalid_platform_result.returncode == 2
+
+    def test_invalid_platform_message(
+        self, invalid_platform_result: subprocess.CompletedProcess[str]
+    ) -> None:
+        """Test error message for invalid platform."""
+        assert "Invalid platform" in invalid_platform_result.stderr
+
+    def test_empty_subnet_ids_exit_code(
+        self, empty_subnets_result: subprocess.CompletedProcess[str]
+    ) -> None:
+        """Test exit code for empty subnet_ids."""
+        assert empty_subnets_result.returncode == 2
+
+    def test_empty_subnet_ids_message(
+        self, empty_subnets_result: subprocess.CompletedProcess[str]
+    ) -> None:
+        """Test error message for empty subnet_ids."""
+        assert "subnet_ids must be a non-empty list" in empty_subnets_result.stderr
+
+    def test_empty_instance_types_exit_code(
+        self, empty_instance_types_result: subprocess.CompletedProcess[str]
+    ) -> None:
+        """Test exit code for empty instance_types."""
+        assert empty_instance_types_result.returncode == 2
+
+    def test_empty_instance_types_message(
+        self, empty_instance_types_result: subprocess.CompletedProcess[str]
+    ) -> None:
+        """Test error message for empty instance_types."""
+        assert "instance_types must be a non-empty list" in \
+            empty_instance_types_result.stderr
 
 
 @pytest.mark.e2e
 class TestModuleExecution:
     """E2E tests for module execution."""
 
-    def test_python_m_orfmi(self) -> None:
-        """Test running via python -m orfmi."""
-        result = subprocess.run(
-            [sys.executable, "-m", "orfmi", "--help"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        assert result.returncode == 0
-        assert "Open Rainforest Machine Image" in result.stdout
+    def test_module_exit_code(
+        self, module_help_result: subprocess.CompletedProcess[str]
+    ) -> None:
+        """Test python -m orfmi --help returns exit code 0."""
+        assert module_help_result.returncode == 0
 
-    def test_module_shows_options(self) -> None:
-        """Test that module help shows expected options."""
-        result = subprocess.run(
-            [sys.executable, "-m", "orfmi", "--help"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        assert "--config-file" in result.stdout
+    def test_module_shows_description(
+        self, module_help_result: subprocess.CompletedProcess[str]
+    ) -> None:
+        """Test python -m orfmi --help shows description."""
+        assert "Open Rainforest Machine Image" in module_help_result.stdout
+
+    def test_module_shows_config_option(
+        self, module_help_result: subprocess.CompletedProcess[str]
+    ) -> None:
+        """Test python -m orfmi --help shows --config-file option."""
+        assert "--config-file" in module_help_result.stdout
