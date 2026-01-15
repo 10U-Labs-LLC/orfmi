@@ -92,12 +92,6 @@ class TestCliHelp:
         """Test --help shows --setup-file option."""
         assert "--setup-file" in help_result.stdout
 
-    def test_help_shows_extra_files_option(
-        self, help_result: subprocess.CompletedProcess[str]
-    ) -> None:
-        """Test --help shows --extra-files option."""
-        assert "--extra-files" in help_result.stdout
-
     def test_help_shows_verbose_option(
         self, help_result: subprocess.CompletedProcess[str]
     ) -> None:

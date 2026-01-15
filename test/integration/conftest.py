@@ -1,7 +1,7 @@
 """Integration test configuration."""
 
 from pathlib import Path
-from test.conftest import create_test_files, run_main_with_args
+from test.conftest import run_main_with_args
 from typing import Any
 from unittest.mock import patch
 
@@ -22,6 +22,7 @@ subnet_ids:
 instance_types:
   - t3.micro
   - t3.small
+security_group_id: sg-12345
 ami_description: My custom AMI for testing
 iam_instance_profile: my-profile
 ssh_username: ubuntu
@@ -43,23 +44,3 @@ tags:
         ])
         config = mock_builder.call_args[0][0]
         return exit_code, config
-
-
-@pytest.fixture
-def extra_files_result(tmp_path: Path) -> tuple[int, list[Path]]:
-    """Run CLI with extra files and return exit code and extra files list."""
-    config_file, setup_file = create_test_files(tmp_path)
-    extra1 = tmp_path / "extra1.txt"
-    extra1.write_text("extra1")
-    extra2 = tmp_path / "extra2.txt"
-    extra2.write_text("extra2")
-
-    with patch("orfmi.cli.AmiBuilder") as mock_builder:
-        mock_builder.return_value.build.return_value = "ami-12345"
-        exit_code = run_main_with_args([
-            "--config-file", str(config_file),
-            "--setup-file", str(setup_file),
-            "--extra-files", str(extra1), str(extra2),
-        ])
-        extra_files = mock_builder.call_args[0][2]
-        return exit_code, extra_files

@@ -149,34 +149,3 @@ class TestCliConfigParsing:
         """Test that ssh_username is parsed correctly."""
         _, config = full_config_result
         assert config.ssh.username == "ubuntu"
-
-@pytest.mark.integration
-class TestCliExtraFiles:
-    """Integration tests for extra files handling."""
-
-    def test_extra_files_exit_code(
-        self, extra_files_result: tuple[int, list[Path]]
-    ) -> None:
-        """Test that extra files handling returns success."""
-        exit_code, _ = extra_files_result
-        assert exit_code == EXIT_SUCCESS
-
-    def test_extra_files_count(
-        self, extra_files_result: tuple[int, list[Path]]
-    ) -> None:
-        """Test that correct number of extra files are passed."""
-        _, extra_files = extra_files_result
-        assert len(extra_files) == 2
-
-    def test_no_extra_files_by_default(self, tmp_path: Path) -> None:
-        """Test that no extra files are passed by default."""
-        config_file, setup_file = create_test_files(tmp_path)
-        with patch("orfmi.cli.AmiBuilder") as mock_builder:
-            mock_builder.return_value.build.return_value = "ami-12345"
-            run_main_with_args([
-                "--config-file", str(config_file),
-                "--setup-file", str(setup_file),
-            ])
-            call_args = mock_builder.call_args
-            extra_files = call_args[0][2]
-            assert not extra_files

@@ -2,7 +2,7 @@
 
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -20,12 +20,9 @@ from .ec2 import (
     create_fleet_instance,
     create_key_pair,
     create_launch_template,
-    create_security_group,
     delete_key_pair,
     delete_launch_template,
-    delete_security_group,
     generate_unique_id,
-    get_vpc_from_subnet,
     lookup_source_ami,
     terminate_instance,
     wait_for_instance,
@@ -40,7 +37,6 @@ class BuildState:
     """Mutable state tracking for the AMI build process."""
 
     instance_id: str | None = None
-    sg_id: str | None = None
     key_material: str | None = None
     result: str | None = None
 
@@ -53,7 +49,6 @@ class BuildContext:
     config: AmiConfig
     setup_script: Path
     unique_id: str
-    extra_files: list[Path] = field(default_factory=list)
 
     def resource_name(self, suffix: str = "") -> str:
         """Generate a resource name with optional suffix."""
@@ -68,18 +63,15 @@ class AmiBuilder:
         self,
         config: AmiConfig,
         setup_script: Path,
-        extra_files: list[Path] | None = None,
     ) -> None:
         """Initialize the AMI builder.
 
         Args:
             config: AMI configuration.
             setup_script: Path to the setup script.
-            extra_files: Optional list of additional files to upload.
         """
         self.config = config
         self.setup_script = setup_script
-        self.extra_files = extra_files or []
 
     def validate(self) -> bool:
         """Validate the build configuration.
@@ -93,6 +85,7 @@ class AmiBuilder:
             and self.config.source_ami
             and self.config.instance.subnet_ids
             and self.config.instance.instance_types
+            and self.config.instance.security_group_id
         )
 
     def build(self) -> str:
@@ -111,7 +104,6 @@ class AmiBuilder:
             config=self.config,
             setup_script=self.setup_script,
             unique_id=unique_id,
-            extra_files=self.extra_files,
         )
         state = BuildState()
 
@@ -131,19 +123,12 @@ class AmiBuilder:
         ec2 = ctx.ec2
         key_name = ctx.resource_name()
         template_name = ctx.resource_name()
-        sg_name = ctx.resource_name()
 
         logger.info("Subnets: %s", config.instance.subnet_ids)
-        vpc_id = get_vpc_from_subnet(ec2, config.instance.subnet_ids[0])
-        logger.info("VPC: %s", vpc_id)
+        logger.info("Security Group: %s", config.instance.security_group_id)
 
         logger.info("Creating temporary key pair...")
         state.key_material = create_key_pair(ec2, key_name, config.tags)
-
-        logger.info("Creating temporary security group...")
-        state.sg_id = create_security_group(
-            ec2, vpc_id, sg_name, config.tags, config.platform
-        )
 
         logger.info("Looking up source AMI: %s", config.source_ami)
         source_ami_id = lookup_source_ami(ec2, config.source_ami)
@@ -153,7 +138,7 @@ class AmiBuilder:
         lt_params = LaunchTemplateParams(
             template_name=template_name,
             base_ami=source_ami_id,
-            sg_id=state.sg_id,
+            sg_id=config.instance.security_group_id,
             key_name=key_name,
             iam_profile=config.instance.iam_instance_profile,
         )
@@ -243,7 +228,7 @@ class AmiBuilder:
                 timeout=config.ssh.timeout,
                 retries=config.ssh.retries,
             )
-            run_setup_script(ssh_config, ctx.setup_script, ctx.extra_files)
+            run_setup_script(ssh_config, ctx.setup_script)
 
         check_instance_state(ec2, state.instance_id)
 
@@ -263,8 +248,3 @@ class AmiBuilder:
         logger.info("Deleting temporary key pair...")
         delete_key_pair(ec2, key_name)
         logger.info("Temporary key pair deleted.")
-
-        if state.sg_id:
-            logger.info("Deleting temporary security group...")
-            delete_security_group(ec2, state.sg_id)
-            logger.info("Temporary security group deleted.")

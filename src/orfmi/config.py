@@ -22,6 +22,7 @@ class InstanceSettings:
 
     subnet_ids: list[str]
     instance_types: list[str]
+    security_group_id: str
     iam_instance_profile: str | None = None
     purchase_type: str = "on-demand"
     max_retries: int = 3
@@ -54,7 +55,14 @@ class ConfigError(Exception):
 
 def _validate_required_fields(data: dict[str, Any]) -> None:
     """Validate that all required fields are present."""
-    required = ["ami_name", "region", "source_ami", "subnet_ids", "instance_types"]
+    required = [
+        "ami_name",
+        "region",
+        "source_ami",
+        "subnet_ids",
+        "instance_types",
+        "security_group_id",
+    ]
     missing = [f for f in required if f not in data or data[f] is None]
     if missing:
         raise ConfigError(f"Missing required fields: {', '.join(missing)}")
@@ -130,6 +138,7 @@ def load_config(config_path: Path) -> AmiConfig:
     instance_settings = InstanceSettings(
         subnet_ids=[str(s) for s in data["subnet_ids"]],
         instance_types=[str(t) for t in data["instance_types"]],
+        security_group_id=str(data["security_group_id"]),
         iam_instance_profile=data.get("iam_instance_profile"),
         purchase_type=str(data.get("purchase_type", "on-demand")),
         max_retries=int(data.get("max_retries", 3)),

@@ -16,7 +16,11 @@ from orfmi.ec2 import CapacityError, InstanceTerminatedError
 def make_test_config() -> AmiConfig:
     """Create a test AmiConfig."""
     ami = AmiIdentity(name="test-ami")
-    instance = InstanceSettings(subnet_ids=["subnet-1"], instance_types=["t3.micro"])
+    instance = InstanceSettings(
+        subnet_ids=["subnet-1"],
+        instance_types=["t3.micro"],
+        security_group_id="sg-12345",
+    )
     return AmiConfig(
         ami=ami,
         region="us-east-1",
@@ -33,11 +37,6 @@ class TestBuildState:
         """Test default values."""
         state = BuildState()
         assert state.instance_id is None
-
-    def test_sg_id_default(self) -> None:
-        """Test sg_id default value."""
-        state = BuildState()
-        assert state.sg_id is None
 
     def test_key_material_default(self) -> None:
         """Test key_material default value."""
@@ -103,28 +102,6 @@ class TestBuildContext:
         )
         assert ctx.unique_id == "abc12345"
 
-    def test_extra_files_default(self, tmp_path: Path) -> None:
-        """Test extra_files defaults to empty list."""
-        ctx = BuildContext(
-            ec2=MagicMock(),
-            config=make_test_config(),
-            setup_script=tmp_path / "setup.sh",
-            unique_id="abc12345",
-        )
-        assert not ctx.extra_files
-
-    def test_extra_files_with_values(self, tmp_path: Path) -> None:
-        """Test extra_files with values."""
-        extra = [tmp_path / "extra.txt"]
-        ctx = BuildContext(
-            ec2=MagicMock(),
-            config=make_test_config(),
-            setup_script=tmp_path / "setup.sh",
-            unique_id="abc12345",
-            extra_files=extra,
-        )
-        assert len(ctx.extra_files) == 1
-
     def test_resource_name_without_suffix(self, tmp_path: Path) -> None:
         """Test resource_name without suffix."""
         ctx = BuildContext(
@@ -162,17 +139,6 @@ class TestAmiBuilder:
         builder = AmiBuilder(make_test_config(), setup_script)
         assert builder.setup_script == setup_script
 
-    def test_init_extra_files_default(self, tmp_path: Path) -> None:
-        """Test AmiBuilder extra_files defaults to empty list."""
-        builder = AmiBuilder(make_test_config(), tmp_path / "setup.sh")
-        assert not builder.extra_files
-
-    def test_init_with_extra_files(self, tmp_path: Path) -> None:
-        """Test AmiBuilder initialization with extra files."""
-        extra_files = [tmp_path / "file1.txt", tmp_path / "file2.txt"]
-        builder = AmiBuilder(make_test_config(), tmp_path / "setup.sh", extra_files)
-        assert builder.extra_files == extra_files
-
     def test_validate_returns_true(self, tmp_path: Path) -> None:
         """Test validate returns True for valid config."""
         builder = AmiBuilder(make_test_config(), tmp_path / "setup.sh")
@@ -197,16 +163,6 @@ class TestAmiBuilder:
         builder = AmiBuilder(make_test_config(), setup_script)
         builder.build()
         assert builder_mocks["create_key"].call_count == 1
-
-    def test_build_calls_create_sg(
-        self, tmp_path: Path, builder_mocks: dict[str, Any]
-    ) -> None:
-        """Test build calls create_security_group."""
-        setup_script = tmp_path / "setup.sh"
-        setup_script.write_text("#!/bin/bash\necho 'Hello'")
-        builder = AmiBuilder(make_test_config(), setup_script)
-        builder.build()
-        assert builder_mocks["create_sg"].call_count == 1
 
     def test_build_calls_create_ami(
         self, tmp_path: Path, builder_mocks: dict[str, Any]

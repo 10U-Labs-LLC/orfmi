@@ -11,6 +11,7 @@ from .config import (
     AmiIdentity,
     ConfigError,
     InstanceSettings,
+    SSHSettings,
     load_config,
 )
 
@@ -52,16 +53,20 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--subnet-ids",
         type=str,
-        nargs="+",
-        metavar="SUBNET",
-        help="Subnet IDs for instance launch (required if not using --config-file).",
+        metavar="SUBNETS",
+        help="Comma-separated subnet IDs (required if not using --config-file).",
     )
     parser.add_argument(
         "--instance-types",
         type=str,
-        nargs="+",
-        metavar="TYPE",
-        help="Instance types to try (required if not using --config-file).",
+        metavar="TYPES",
+        help="Comma-separated instance types (required if not using --config-file).",
+    )
+    parser.add_argument(
+        "--security-group-id",
+        type=str,
+        metavar="SG_ID",
+        help="Security group ID (required if not using --config-file).",
     )
     parser.add_argument(
         "--purchase-type",
@@ -84,11 +89,47 @@ def create_parser() -> argparse.ArgumentParser:
         help="Path to the setup script (bash for Linux, PowerShell for Windows).",
     )
     parser.add_argument(
-        "--extra-files",
-        type=Path,
-        nargs="*",
-        metavar="FILE",
-        help="Additional files to upload to the instance.",
+        "--ami-description",
+        type=str,
+        metavar="DESC",
+        help="Description for the AMI.",
+    )
+    parser.add_argument(
+        "--iam-instance-profile",
+        type=str,
+        metavar="PROFILE",
+        help="IAM instance profile name.",
+    )
+    parser.add_argument(
+        "--ssh-username",
+        type=str,
+        metavar="USER",
+        help="SSH username for connecting (default: admin).",
+    )
+    parser.add_argument(
+        "--ssh-timeout",
+        type=int,
+        metavar="SECONDS",
+        help="SSH command timeout in seconds (default: 300).",
+    )
+    parser.add_argument(
+        "--ssh-retries",
+        type=int,
+        metavar="N",
+        help="Number of SSH connection retries (default: 30).",
+    )
+    parser.add_argument(
+        "--platform",
+        type=str,
+        choices=["linux", "windows"],
+        metavar="PLATFORM",
+        help="Platform: linux or windows (default: linux).",
+    )
+    parser.add_argument(
+        "--tags",
+        type=str,
+        metavar="TAGS",
+        help="Tags as key=value pairs separated by commas (e.g., Name=test,Env=prod).",
     )
     parser.add_argument(
         "-v",
@@ -132,13 +173,15 @@ def validate_args(args: argparse.Namespace) -> None:
         args.source_ami,
         args.subnet_ids,
         args.instance_types,
+        args.security_group_id,
     ]
     has_config_flags = any(f is not None for f in config_flags)
 
     if args.config_file and has_config_flags:
         print(
             "Error: --config-file cannot be used with "
-            "--ami-name, --region, --source-ami, --subnet-ids, --instance-types",
+            "--ami-name, --region, --source-ami, --subnet-ids, "
+            "--instance-types, --security-group-id",
             file=sys.stderr,
         )
         sys.exit(EXIT_ERROR)
@@ -155,6 +198,8 @@ def validate_args(args: argparse.Namespace) -> None:
             missing.append("--subnet-ids")
         if not args.instance_types:
             missing.append("--instance-types")
+        if not args.security_group_id:
+            missing.append("--security-group-id")
         if missing:
             print(
                 f"Error: Required when not using --config-file: {', '.join(missing)}",
@@ -181,6 +226,25 @@ def validate_files(
     return True
 
 
+def parse_tags(tags_str: str | None) -> dict[str, str]:
+    """Parse tags from comma-separated key=value pairs.
+
+    Args:
+        tags_str: String like "Name=test,Env=prod" or None.
+
+    Returns:
+        Dictionary of tag key-value pairs.
+    """
+    if not tags_str:
+        return {}
+    tags = {}
+    for pair in tags_str.split(","):
+        if "=" in pair:
+            key, value = pair.split("=", 1)
+            tags[key.strip()] = value.strip()
+    return tags
+
+
 def build_config_from_args(args: argparse.Namespace) -> AmiConfig:
     """Build AmiConfig from CLI arguments.
 
@@ -190,18 +254,34 @@ def build_config_from_args(args: argparse.Namespace) -> AmiConfig:
     Returns:
         AmiConfig constructed from CLI arguments.
     """
-    ami_identity = AmiIdentity(name=args.ami_name)
+    subnet_ids = [s.strip() for s in args.subnet_ids.split(",")]
+    instance_types = [t.strip() for t in args.instance_types.split(",")]
+
+    ami_identity = AmiIdentity(
+        name=args.ami_name,
+        description=args.ami_description or "",
+    )
     instance_settings = InstanceSettings(
-        subnet_ids=args.subnet_ids,
-        instance_types=args.instance_types,
+        subnet_ids=subnet_ids,
+        instance_types=instance_types,
+        security_group_id=args.security_group_id,
+        iam_instance_profile=args.iam_instance_profile,
         purchase_type=args.purchase_type or "on-demand",
         max_retries=args.max_retries if args.max_retries is not None else 3,
+    )
+    ssh_settings = SSHSettings(
+        username=args.ssh_username or "admin",
+        timeout=args.ssh_timeout if args.ssh_timeout is not None else 300,
+        retries=args.ssh_retries if args.ssh_retries is not None else 30,
     )
     return AmiConfig(
         ami=ami_identity,
         region=args.region,
         source_ami=args.source_ami,
         instance=instance_settings,
+        tags=parse_tags(args.tags),
+        ssh=ssh_settings,
+        platform=args.platform or "linux",
     )
 
 
@@ -221,6 +301,7 @@ def apply_overrides(config: AmiConfig, args: argparse.Namespace) -> AmiConfig:
     new_instance = InstanceSettings(
         subnet_ids=config.instance.subnet_ids,
         instance_types=config.instance.instance_types,
+        security_group_id=config.instance.security_group_id,
         iam_instance_profile=config.instance.iam_instance_profile,
         purchase_type=args.purchase_type or config.instance.purchase_type,
         max_retries=(
@@ -264,8 +345,7 @@ def main() -> None:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(EXIT_ERROR)
 
-    extra_files = args.extra_files or []
-    builder = AmiBuilder(config, args.setup_file, extra_files)
+    builder = AmiBuilder(config, args.setup_file)
 
     try:
         ami_id = builder.build()

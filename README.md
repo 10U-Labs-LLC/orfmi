@@ -23,8 +23,9 @@ orfmi --config-file config.yml --setup-file setup.sh
 orfmi --ami-name my-ami \
       --region us-east-1 \
       --source-ami "debian-12-*" \
-      --subnet-ids subnet-12345 subnet-67890 \
-      --instance-types t3.micro t3.small \
+      --subnet-ids subnet-12345,subnet-67890 \
+      --instance-types t3.micro,t3.small \
+      --security-group-id sg-12345abc \
       --setup-file setup.sh
 ```
 
@@ -38,8 +39,9 @@ Either use `--config-file` OR provide all individual flags:
 - `--ami-name NAME` - Name for the created AMI
 - `--region REGION` - AWS region
 - `--source-ami AMI_ID` - Source AMI name pattern
-- `--subnet-ids SUBNET [SUBNET ...]` - Subnet IDs for instance launch
-- `--instance-types TYPE [TYPE ...]` - Instance types to try
+- `--subnet-ids SUBNETS` - Comma-separated subnet IDs
+- `--instance-types TYPES` - Comma-separated instance types
+- `--security-group-id SG_ID` - Security group ID
 
 #### Always Required
 
@@ -47,9 +49,15 @@ Either use `--config-file` OR provide all individual flags:
 
 #### Optional
 
+- `--ami-description DESC` - Description for the AMI
+- `--iam-instance-profile PROFILE` - IAM instance profile name
 - `--purchase-type TYPE` - Purchase type: `on-demand` or `spot`
 - `--max-retries N` - Maximum retries on capacity errors (default: 3)
-- `--extra-files FILE [FILE ...]` - Additional files to upload
+- `--ssh-username USER` - SSH username for connecting (default: admin)
+- `--ssh-timeout SECONDS` - SSH timeout in seconds (default: 300)
+- `--ssh-retries N` - SSH connection retries (default: 30)
+- `--platform PLATFORM` - Platform: `linux` or `windows` (default: linux)
+- `--tags TAGS` - Tags as key=value,key=value (e.g., Name=test,Env=prod)
 - `-v, --verbose` - Enable verbose output
 - `-q, --quiet` - Suppress output except for errors and the final AMI ID
 
@@ -68,6 +76,7 @@ subnet_ids:
 instance_types:
   - t3.micro
   - t3.small
+security_group_id: sg-12345abc
 
 # Optional fields
 ami_description: My custom AMI for production
@@ -85,13 +94,14 @@ tags:
 
 ### Required Fields
 
-| Field           | Description                                   |
-| --------------- | --------------------------------------------- |
-| `ami_name`      | Name for the created AMI                      |
-| `region`        | AWS region                                    |
-| `source_ami`    | Source AMI name pattern (supports wildcards)  |
-| `subnet_ids`    | List of subnet IDs for launching the instance |
-| `instance_types`| List of instance types to try (uses EC2 Fleet)|
+| Field              | Description                                  |
+| ------------------ | -------------------------------------------- |
+| `ami_name`         | Name for the created AMI                     |
+| `region`           | AWS region                                   |
+| `source_ami`       | Source AMI name pattern (supports wildcards) |
+| `subnet_ids`       | List of subnet IDs for launching the instance|
+| `instance_types`   | List of instance types to try (EC2 Fleet)    |
+| `security_group_id`| Security group ID with SSH/RDP access        |
 
 ### Optional Fields
 
@@ -165,12 +175,12 @@ AMI_ID=ami-0123456789abcdef0
 
 1. Parses the configuration file or CLI arguments
 2. Looks up the source AMI by name pattern
-3. Creates temporary resources (key pair, security group, launch template)
+3. Creates temporary resources (key pair, launch template)
 4. Launches an EC2 instance using EC2 Fleet (on-demand or spot)
 5. Waits for the instance to be ready
 6. Connects via SSH and runs the setup script
 7. Creates an AMI from the configured instance
-8. Cleans up all temporary resources
+8. Cleans up temporary resources
 9. Outputs the AMI ID
 
 ### Retry Logic
@@ -178,7 +188,3 @@ AMI_ID=ami-0123456789abcdef0
 The tool automatically retries on capacity errors (e.g., insufficient
 capacity, instance limit exceeded) and spot instance interruptions.
 Use `--max-retries` to configure the maximum number of retry attempts.
-
-## License
-
-Apache License 2.0

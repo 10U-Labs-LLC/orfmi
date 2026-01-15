@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from orfmi.ssh import SshConfig, connect_ssh, run_setup_script, run_ssh_command, upload_file
+from orfmi.ssh import SshConfig, connect_ssh, run_ssh_command, upload_file
 
 
 @pytest.mark.unit
@@ -209,30 +209,6 @@ class TestRunSetupScript:
     ) -> None:
         """Test running setup script closes connection."""
         assert run_setup_script_mocks["mock_client"].close.call_count == 1
-
-    @patch("orfmi.ssh.connect_ssh")
-    @patch("orfmi.ssh.run_ssh_command")
-    def test_uploads_extra_files(
-        self, _mock_run_cmd: MagicMock, mock_connect: MagicMock, tmp_path: Path
-    ) -> None:
-        """Test uploading extra files."""
-        mock_client = MagicMock()
-        mock_connect.return_value = mock_client
-        mock_sftp = MagicMock()
-        mock_client.open_sftp.return_value = mock_sftp
-
-        setup_script = tmp_path / "setup.sh"
-        setup_script.write_text("#!/bin/bash\necho 'Hello'")
-        extra_file = tmp_path / "extra.txt"
-        extra_file.write_text("extra content")
-
-        config = SshConfig(
-            ip_address="1.2.3.4",
-            key_material="private-key",
-            username="admin",
-        )
-        run_setup_script(config, setup_script, [extra_file])
-        assert mock_sftp.put.call_count == 2
 
 
 @pytest.mark.unit

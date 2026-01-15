@@ -15,6 +15,7 @@ from orfmi.cli import (
     apply_overrides,
     build_config_from_args,
     create_parser,
+    parse_tags,
     setup_logging,
     validate_args,
     validate_files,
@@ -48,12 +49,6 @@ class TestCreateParser:
         """Test parsing valid arguments - quiet default."""
         assert parsed_valid_args.quiet is False
 
-    def test_valid_arguments_extra_files_default(
-        self, parsed_valid_args: argparse.Namespace
-    ) -> None:
-        """Test parsing valid arguments - extra_files default."""
-        assert parsed_valid_args.extra_files is None
-
     def test_verbose_flag(self) -> None:
         """Test --verbose flag."""
         parser = create_parser()
@@ -73,16 +68,6 @@ class TestCreateParser:
             "--quiet",
         ])
         assert args.quiet is True
-
-    def test_extra_files(self) -> None:
-        """Test --extra-files argument."""
-        parser = create_parser()
-        args = parser.parse_args([
-            "--config-file", "config.yml",
-            "--setup-file", "setup.sh",
-            "--extra-files", "file1.txt", "file2.txt",
-        ])
-        assert args.extra_files == [Path("file1.txt"), Path("file2.txt")]
 
     def test_short_verbose(self) -> None:
         """Test -v short flag for verbose."""
@@ -111,11 +96,66 @@ class TestCreateParser:
             "--ami-name", "my-ami",
             "--region", "us-east-1",
             "--source-ami", "ami-12345",
-            "--subnet-ids", "subnet-1", "subnet-2",
+            "--subnet-ids", "subnet-1,subnet-2",
             "--instance-types", "t3.micro",
+            "--security-group-id", "sg-12345",
             "--setup-file", "setup.sh",
         ])
         assert args.ami_name == "my-ami"
+
+    def test_security_group_id_flag(self) -> None:
+        """Test --security-group-id flag."""
+        parser = create_parser()
+        args = parser.parse_args([
+            "--ami-name", "my-ami",
+            "--region", "us-east-1",
+            "--source-ami", "ami-12345",
+            "--subnet-ids", "subnet-1",
+            "--instance-types", "t3.micro",
+            "--security-group-id", "sg-12345",
+            "--setup-file", "setup.sh",
+        ])
+        assert args.security_group_id == "sg-12345"
+
+    def test_ami_description_flag(self) -> None:
+        """Test --ami-description flag."""
+        parser = create_parser()
+        args = parser.parse_args([
+            "--config-file", "config.yml",
+            "--setup-file", "setup.sh",
+            "--ami-description", "My AMI description",
+        ])
+        assert args.ami_description == "My AMI description"
+
+    def test_ssh_username_flag(self) -> None:
+        """Test --ssh-username flag."""
+        parser = create_parser()
+        args = parser.parse_args([
+            "--config-file", "config.yml",
+            "--setup-file", "setup.sh",
+            "--ssh-username", "ubuntu",
+        ])
+        assert args.ssh_username == "ubuntu"
+
+    def test_platform_flag(self) -> None:
+        """Test --platform flag."""
+        parser = create_parser()
+        args = parser.parse_args([
+            "--config-file", "config.yml",
+            "--setup-file", "setup.sh",
+            "--platform", "windows",
+        ])
+        assert args.platform == "windows"
+
+    def test_tags_flag(self) -> None:
+        """Test --tags flag."""
+        parser = create_parser()
+        args = parser.parse_args([
+            "--config-file", "config.yml",
+            "--setup-file", "setup.sh",
+            "--tags", "Name=test,Env=prod",
+        ])
+        assert args.tags == "Name=test,Env=prod"
 
     def test_purchase_type_flag(self) -> None:
         """Test --purchase-type flag."""
@@ -293,6 +333,7 @@ class TestMain:
                 "--source-ami", "ami-12345",
                 "--subnet-ids", "subnet-1",
                 "--instance-types", "t3.micro",
+                "--security-group-id", "sg-12345",
                 "--setup-file", str(setup_file),
             ])
             assert exit_code == EXIT_SUCCESS
@@ -332,6 +373,7 @@ class TestValidateArgs:
             "--source-ami", "ami-12345",
             "--subnet-ids", "subnet-1",
             "--instance-types", "t3.micro",
+            "--security-group-id", "sg-12345",
             "--setup-file", "setup.sh",
         ])
         validate_args(args)
@@ -366,6 +408,21 @@ class TestValidateArgs:
             "--source-ami", "ami-12345",
             "--subnet-ids", "subnet-1",
             "--instance-types", "t3.micro",
+            "--security-group-id", "sg-12345",
+            "--setup-file", "setup.sh",
+        ])
+        with pytest.raises(SystemExit):
+            validate_args(args)
+
+    def test_rejects_missing_security_group_id(self) -> None:
+        """Test that missing security_group_id is reported."""
+        parser = create_parser()
+        args = parser.parse_args([
+            "--ami-name", "my-ami",
+            "--region", "us-east-1",
+            "--source-ami", "ami-12345",
+            "--subnet-ids", "subnet-1",
+            "--instance-types", "t3.micro",
             "--setup-file", "setup.sh",
         ])
         with pytest.raises(SystemExit):
@@ -384,6 +441,38 @@ class TestValidateArgs:
 
 
 @pytest.mark.unit
+class TestParseTags:
+    """Tests for parse_tags function."""
+
+    def test_parses_empty_string(self) -> None:
+        """Test parsing empty string returns empty dict."""
+        assert not parse_tags("")
+
+    def test_parses_none(self) -> None:
+        """Test parsing None returns empty dict."""
+        assert not parse_tags(None)
+
+    def test_parses_single_tag(self) -> None:
+        """Test parsing single tag."""
+        assert parse_tags("Name=test") == {"Name": "test"}
+
+    def test_parses_multiple_tags(self) -> None:
+        """Test parsing multiple tags."""
+        result = parse_tags("Name=test,Env=prod")
+        assert result == {"Name": "test", "Env": "prod"}
+
+    def test_strips_whitespace(self) -> None:
+        """Test that whitespace is stripped."""
+        result = parse_tags("Name = test , Env = prod")
+        assert result == {"Name": "test", "Env": "prod"}
+
+    def test_handles_value_with_equals(self) -> None:
+        """Test handling value containing equals sign."""
+        result = parse_tags("Config=a=b")
+        assert result == {"Config": "a=b"}
+
+
+@pytest.mark.unit
 class TestBuildConfigFromArgs:
     """Tests for build_config_from_args function."""
 
@@ -396,10 +485,26 @@ class TestBuildConfigFromArgs:
             "--source-ami", "ami-12345",
             "--subnet-ids", "subnet-1",
             "--instance-types", "t3.micro",
+            "--security-group-id", "sg-12345",
             "--setup-file", "setup.sh",
         ])
         config = build_config_from_args(args)
         assert config.ami.name == "my-ami"
+
+    def test_builds_config_with_security_group(self) -> None:
+        """Test that config is built with security_group_id."""
+        parser = create_parser()
+        args = parser.parse_args([
+            "--ami-name", "my-ami",
+            "--region", "us-east-1",
+            "--source-ami", "ami-12345",
+            "--subnet-ids", "subnet-1",
+            "--instance-types", "t3.micro",
+            "--security-group-id", "sg-12345",
+            "--setup-file", "setup.sh",
+        ])
+        config = build_config_from_args(args)
+        assert config.instance.security_group_id == "sg-12345"
 
     def test_builds_config_with_purchase_type(self) -> None:
         """Test that config is built with purchase_type."""
@@ -410,6 +515,7 @@ class TestBuildConfigFromArgs:
             "--source-ami", "ami-12345",
             "--subnet-ids", "subnet-1",
             "--instance-types", "t3.micro",
+            "--security-group-id", "sg-12345",
             "--purchase-type", "spot",
             "--setup-file", "setup.sh",
         ])
@@ -425,6 +531,7 @@ class TestBuildConfigFromArgs:
             "--source-ami", "ami-12345",
             "--subnet-ids", "subnet-1",
             "--instance-types", "t3.micro",
+            "--security-group-id", "sg-12345",
             "--max-retries", "5",
             "--setup-file", "setup.sh",
         ])
@@ -440,10 +547,91 @@ class TestBuildConfigFromArgs:
             "--source-ami", "ami-12345",
             "--subnet-ids", "subnet-1",
             "--instance-types", "t3.micro",
+            "--security-group-id", "sg-12345",
             "--setup-file", "setup.sh",
         ])
         config = build_config_from_args(args)
         assert config.instance.purchase_type == "on-demand"
+
+    def test_splits_comma_separated_subnet_ids(self) -> None:
+        """Test that comma-separated subnet IDs are split."""
+        parser = create_parser()
+        args = parser.parse_args([
+            "--ami-name", "my-ami",
+            "--region", "us-east-1",
+            "--source-ami", "ami-12345",
+            "--subnet-ids", "subnet-1,subnet-2",
+            "--instance-types", "t3.micro",
+            "--security-group-id", "sg-12345",
+            "--setup-file", "setup.sh",
+        ])
+        config = build_config_from_args(args)
+        assert config.instance.subnet_ids == ["subnet-1", "subnet-2"]
+
+    def test_splits_comma_separated_instance_types(self) -> None:
+        """Test that comma-separated instance types are split."""
+        parser = create_parser()
+        args = parser.parse_args([
+            "--ami-name", "my-ami",
+            "--region", "us-east-1",
+            "--source-ami", "ami-12345",
+            "--subnet-ids", "subnet-1",
+            "--instance-types", "t3.micro,t3.small",
+            "--security-group-id", "sg-12345",
+            "--setup-file", "setup.sh",
+        ])
+        config = build_config_from_args(args)
+        assert config.instance.instance_types == ["t3.micro", "t3.small"]
+
+    def test_builds_config_with_tags(self) -> None:
+        """Test that config is built with tags."""
+        parser = create_parser()
+        args = parser.parse_args([
+            "--ami-name", "my-ami",
+            "--region", "us-east-1",
+            "--source-ami", "ami-12345",
+            "--subnet-ids", "subnet-1",
+            "--instance-types", "t3.micro",
+            "--security-group-id", "sg-12345",
+            "--tags", "Name=test,Env=prod",
+            "--setup-file", "setup.sh",
+        ])
+        config = build_config_from_args(args)
+        assert config.tags == {"Name": "test", "Env": "prod"}
+
+    def test_builds_config_with_ssh_settings(self) -> None:
+        """Test that config is built with SSH settings."""
+        parser = create_parser()
+        args = parser.parse_args([
+            "--ami-name", "my-ami",
+            "--region", "us-east-1",
+            "--source-ami", "ami-12345",
+            "--subnet-ids", "subnet-1",
+            "--instance-types", "t3.micro",
+            "--security-group-id", "sg-12345",
+            "--ssh-username", "ubuntu",
+            "--ssh-timeout", "600",
+            "--ssh-retries", "60",
+            "--setup-file", "setup.sh",
+        ])
+        config = build_config_from_args(args)
+        assert config.ssh.username == "ubuntu"
+
+    def test_builds_config_with_platform(self) -> None:
+        """Test that config is built with platform."""
+        parser = create_parser()
+        args = parser.parse_args([
+            "--ami-name", "my-ami",
+            "--region", "us-east-1",
+            "--source-ami", "ami-12345",
+            "--subnet-ids", "subnet-1",
+            "--instance-types", "t3.micro",
+            "--security-group-id", "sg-12345",
+            "--platform", "windows",
+            "--setup-file", "setup.sh",
+        ])
+        config = build_config_from_args(args)
+        assert config.platform == "windows"
 
 
 @pytest.mark.unit
@@ -456,6 +644,7 @@ class TestApplyOverrides:
         instance = InstanceSettings(
             subnet_ids=["subnet-1"],
             instance_types=["t3.micro"],
+            security_group_id="sg-12345",
         )
         config = AmiConfig(
             ami=ami,
@@ -477,6 +666,7 @@ class TestApplyOverrides:
         instance = InstanceSettings(
             subnet_ids=["subnet-1"],
             instance_types=["t3.micro"],
+            security_group_id="sg-12345",
             purchase_type="on-demand",
         )
         config = AmiConfig(
@@ -500,6 +690,7 @@ class TestApplyOverrides:
         instance = InstanceSettings(
             subnet_ids=["subnet-1"],
             instance_types=["t3.micro"],
+            security_group_id="sg-12345",
             max_retries=3,
         )
         config = AmiConfig(
@@ -523,6 +714,7 @@ class TestApplyOverrides:
         instance = InstanceSettings(
             subnet_ids=["subnet-1"],
             instance_types=["t3.micro"],
+            security_group_id="sg-12345",
         )
         config = AmiConfig(
             ami=ami,

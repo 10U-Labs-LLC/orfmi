@@ -178,6 +178,7 @@ subnet_ids:
   - subnet-1
 instance_types:
   - t3.micro
+security_group_id: sg-12345
 platform: windows
 """)
         config = load_config(config_file)
@@ -194,6 +195,7 @@ subnet_ids:
   - subnet-1
 instance_types:
   - t3.micro
+security_group_id: sg-12345
 purchase_type: spot
 """)
         config = load_config(config_file)
@@ -210,6 +212,7 @@ subnet_ids:
   - subnet-1
 instance_types:
   - t3.micro
+security_group_id: sg-12345
 purchase_type: on-demand
 """)
         config = load_config(config_file)
@@ -226,10 +229,27 @@ subnet_ids:
   - subnet-1
 instance_types:
   - t3.micro
+security_group_id: sg-12345
 max_retries: 5
 """)
         config = load_config(config_file)
         assert config.instance.max_retries == 5
+
+    def test_security_group_id_loaded(self, tmp_path: Path) -> None:
+        """Test that security_group_id is loaded correctly."""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text("""
+ami_name: test-ami
+region: us-east-1
+source_ami: ami-12345
+subnet_ids:
+  - subnet-1
+instance_types:
+  - t3.micro
+security_group_id: sg-67890
+""")
+        config = load_config(config_file)
+        assert config.instance.security_group_id == "sg-67890"
 
 
 @pytest.mark.unit
@@ -269,6 +289,7 @@ source_ami: ami-12345
 subnet_ids: []
 instance_types:
   - t3.micro
+security_group_id: sg-12345
 """)
         with pytest.raises(ConfigError, match="subnet_ids must be a non-empty list"):
             load_config(config_file)
@@ -283,6 +304,7 @@ source_ami: ami-12345
 subnet_ids:
   - subnet-1
 instance_types: []
+security_group_id: sg-12345
 """)
         with pytest.raises(ConfigError, match="instance_types must be a non-empty list"):
             load_config(config_file)
@@ -298,6 +320,7 @@ subnet_ids:
   - subnet-1
 instance_types:
   - t3.micro
+security_group_id: sg-12345
 platform: macos
 """)
         with pytest.raises(ConfigError, match="Invalid platform"):
@@ -314,6 +337,7 @@ subnet_ids:
   - subnet-1
 instance_types:
   - t3.micro
+security_group_id: sg-12345
 tags:
   - Name=test
 """)
@@ -338,7 +362,23 @@ subnet_ids:
   - subnet-1
 instance_types:
   - t3.micro
+security_group_id: sg-12345
 purchase_type: reserved
 """)
         with pytest.raises(ConfigError, match="Invalid purchase_type"):
+            load_config(config_file)
+
+    def test_missing_security_group_id(self, tmp_path: Path) -> None:
+        """Test that ConfigError is raised for missing security_group_id."""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text("""
+ami_name: test-ami
+region: us-east-1
+source_ami: ami-12345
+subnet_ids:
+  - subnet-1
+instance_types:
+  - t3.micro
+""")
+        with pytest.raises(ConfigError, match="Missing required fields"):
             load_config(config_file)

@@ -41,6 +41,7 @@ subnet_ids:
   - subnet-12345
 instance_types:
   - t3.micro
+security_group_id: sg-12345
 """)
     return run_cli(
         "--config-file", str(config_file),
@@ -92,6 +93,7 @@ subnet_ids:
   - subnet-12345
 instance_types:
   - t3.micro
+security_group_id: sg-12345
 platform: macos
 """)
     setup_file = tmp_path / "setup.sh"
@@ -113,6 +115,7 @@ source_ami: debian-12-*
 subnet_ids: []
 instance_types:
   - t3.micro
+security_group_id: sg-12345
 """)
     setup_file = tmp_path / "setup.sh"
     setup_file.touch()
@@ -133,6 +136,7 @@ source_ami: debian-12-*
 subnet_ids:
   - subnet-12345
 instance_types: []
+security_group_id: sg-12345
 """)
     setup_file = tmp_path / "setup.sh"
     setup_file.touch()

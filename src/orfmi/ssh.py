@@ -88,14 +88,12 @@ def upload_file(sftp: paramiko.SFTPClient, local_path: Path, remote_path: str) -
 def run_setup_script(
     config: SshConfig,
     setup_script: Path,
-    extra_files: list[Path] | None = None,
 ) -> None:
     """Upload and run the setup script on the instance via SSH.
 
     Args:
         config: SSH configuration.
         setup_script: Path to the setup script to run.
-        extra_files: Optional list of additional files to upload.
     """
     client = connect_ssh(config)
 
@@ -105,12 +103,6 @@ def run_setup_script(
         remote_script = f"/tmp/{setup_script.name}"
         sftp.put(str(setup_script), remote_script)
         sftp.chmod(remote_script, 0o755)
-
-        if extra_files:
-            for extra_file in extra_files:
-                if extra_file.exists():
-                    sftp.put(str(extra_file), f"/tmp/{extra_file.name}")
-
         sftp.close()
 
         logger.info("Running setup script: %s", setup_script.name)
