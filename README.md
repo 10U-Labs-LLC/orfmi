@@ -47,7 +47,7 @@ Either use `--config-file` OR provide all individual flags:
 
 #### Optional
 
-- `--purchase-type TYPE` - Instance purchase type: `on-demand` or `spot` (default: `on-demand`)
+- `--purchase-type TYPE` - Purchase type: `on-demand` or `spot`
 - `--max-retries N` - Maximum retries on capacity errors (default: 3)
 - `--extra-files FILE [FILE ...]` - Additional files to upload
 - `-v, --verbose` - Enable verbose output
@@ -85,27 +85,27 @@ tags:
 
 ### Required Fields
 
-| Field           | Description                                       |
-| --------------- | ------------------------------------------------- |
-| `ami_name`      | Name for the created AMI                          |
-| `region`        | AWS region                                        |
-| `source_ami`    | Source AMI name pattern (supports wildcards)      |
-| `subnet_ids`    | List of subnet IDs for launching the instance     |
-| `instance_types`| List of instance types to try (uses EC2 Fleet)    |
+| Field           | Description                                   |
+| --------------- | --------------------------------------------- |
+| `ami_name`      | Name for the created AMI                      |
+| `region`        | AWS region                                    |
+| `source_ami`    | Source AMI name pattern (supports wildcards)  |
+| `subnet_ids`    | List of subnet IDs for launching the instance |
+| `instance_types`| List of instance types to try (uses EC2 Fleet)|
 
 ### Optional Fields
 
-| Field                  | Default     | Description                            |
-| ---------------------- | ----------- | -------------------------------------- |
-| `ami_description`      | `""`        | Description for the AMI                |
-| `iam_instance_profile` | `null`      | IAM instance profile name              |
-| `purchase_type`        | `on-demand` | Purchase type (`on-demand` or `spot`)  |
-| `max_retries`          | `3`         | Max retries on capacity errors         |
-| `ssh_username`         | `admin`     | SSH username for connecting            |
-| `ssh_timeout`          | `300`       | SSH command timeout in seconds         |
-| `ssh_retries`          | `30`        | Number of SSH connection retries       |
-| `platform`             | `linux`     | Platform type (`linux`/`windows`)      |
-| `tags`                 | `{}`        | Tags to apply to resources             |
+| Field                  | Default     | Description                   |
+| ---------------------- | ----------- | ----------------------------- |
+| `ami_description`      | `""`        | Description for the AMI       |
+| `iam_instance_profile` | `null`      | IAM instance profile name     |
+| `purchase_type`        | `on-demand` | `on-demand` or `spot`         |
+| `max_retries`          | `3`         | Max retries on capacity errors|
+| `ssh_username`         | `admin`     | SSH username for connecting   |
+| `ssh_timeout`          | `300`       | SSH command timeout (seconds) |
+| `ssh_retries`          | `30`        | Number of SSH connection tries|
+| `platform`             | `linux`     | `linux` or `windows`          |
+| `tags`                 | `{}`        | Tags to apply to resources    |
 
 ## Setup Script
 
