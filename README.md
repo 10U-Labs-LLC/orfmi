@@ -11,17 +11,44 @@ pip install orfmi
 
 ## Usage
 
+### Using a Configuration File
+
 ```bash
 orfmi --config-file config.yml --setup-file setup.sh
 ```
 
-### Required Arguments
+### Using CLI Flags
+
+```bash
+orfmi --ami-name my-ami \
+      --region us-east-1 \
+      --source-ami "debian-12-*" \
+      --subnet-ids subnet-12345 subnet-67890 \
+      --instance-types t3.micro t3.small \
+      --setup-file setup.sh
+```
+
+### Arguments
+
+#### Required (one of)
+
+Either use `--config-file` OR provide all individual flags:
 
 - `--config-file FILE` - Path to the YAML configuration file
+- `--ami-name NAME` - Name for the created AMI
+- `--region REGION` - AWS region
+- `--source-ami AMI_ID` - Source AMI name pattern
+- `--subnet-ids SUBNET [SUBNET ...]` - Subnet IDs for instance launch
+- `--instance-types TYPE [TYPE ...]` - Instance types to try
+
+#### Always Required
+
 - `--setup-file FILE` - Path to the setup script (bash or PowerShell)
 
-### Optional Arguments
+#### Optional
 
+- `--purchase-type TYPE` - Instance purchase type: `on-demand` or `spot` (default: `on-demand`)
+- `--max-retries N` - Maximum retries on capacity errors (default: 3)
 - `--extra-files FILE [FILE ...]` - Additional files to upload
 - `-v, --verbose` - Enable verbose output
 - `-q, --quiet` - Suppress output except for errors and the final AMI ID
@@ -45,10 +72,12 @@ instance_types:
 # Optional fields
 ami_description: My custom AMI for production
 iam_instance_profile: my-instance-profile
-ssh_username: admin  # default: admin
-ssh_timeout: 300     # default: 300 seconds
-ssh_retries: 30      # default: 30 retries
-platform: linux      # linux or windows, default: linux
+purchase_type: on-demand  # on-demand or spot, default: on-demand
+max_retries: 3            # default: 3 retries on capacity errors
+ssh_username: admin       # default: admin
+ssh_timeout: 300          # default: 300 seconds
+ssh_retries: 30           # default: 30 retries
+platform: linux           # linux or windows, default: linux
 tags:
   Name: my-ami
   Environment: production
@@ -66,15 +95,17 @@ tags:
 
 ### Optional Fields
 
-| Field                  | Default   | Description                        |
-| ---------------------- | --------- | ---------------------------------- |
-| `ami_description`      | `""`      | Description for the AMI            |
-| `iam_instance_profile` | `null`    | IAM instance profile name          |
-| `ssh_username`         | `admin`   | SSH username for connecting        |
-| `ssh_timeout`          | `300`     | SSH command timeout in seconds     |
-| `ssh_retries`          | `30`      | Number of SSH connection retries   |
-| `platform`             | `linux`   | Platform type (`linux`/`windows`)  |
-| `tags`                 | `{}`      | Tags to apply to resources         |
+| Field                  | Default     | Description                            |
+| ---------------------- | ----------- | -------------------------------------- |
+| `ami_description`      | `""`        | Description for the AMI                |
+| `iam_instance_profile` | `null`      | IAM instance profile name              |
+| `purchase_type`        | `on-demand` | Purchase type (`on-demand` or `spot`)  |
+| `max_retries`          | `3`         | Max retries on capacity errors         |
+| `ssh_username`         | `admin`     | SSH username for connecting            |
+| `ssh_timeout`          | `300`       | SSH command timeout in seconds         |
+| `ssh_retries`          | `30`        | Number of SSH connection retries       |
+| `platform`             | `linux`     | Platform type (`linux`/`windows`)      |
+| `tags`                 | `{}`        | Tags to apply to resources             |
 
 ## Setup Script
 
@@ -132,15 +163,21 @@ AMI_ID=ami-0123456789abcdef0
 
 ## How It Works
 
-1. Parses the configuration file
+1. Parses the configuration file or CLI arguments
 2. Looks up the source AMI by name pattern
 3. Creates temporary resources (key pair, security group, launch template)
-4. Launches an EC2 spot instance using EC2 Fleet
+4. Launches an EC2 instance using EC2 Fleet (on-demand or spot)
 5. Waits for the instance to be ready
 6. Connects via SSH and runs the setup script
 7. Creates an AMI from the configured instance
 8. Cleans up all temporary resources
 9. Outputs the AMI ID
+
+### Retry Logic
+
+The tool automatically retries on capacity errors (e.g., insufficient
+capacity, instance limit exceeded) and spot instance interruptions.
+Use `--max-retries` to configure the maximum number of retry attempts.
 
 ## License
 
