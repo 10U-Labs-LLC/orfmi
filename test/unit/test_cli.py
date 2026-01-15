@@ -4,6 +4,7 @@ import argparse
 import logging
 from pathlib import Path
 from test.conftest import create_test_files, run_main_with_args
+from test.unit.conftest import BASE_CLI_ARGS
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -492,7 +493,6 @@ class TestBuildConfigFromArgs:
 
     def test_builds_config_with_purchase_type(self) -> None:
         """Test that config is built with purchase_type."""
-        from test.unit.conftest import BASE_CLI_ARGS
         parser = create_parser()
         args = parser.parse_args(BASE_CLI_ARGS + ["--purchase-type", "spot"])
         config = build_config_from_args(args)
@@ -500,7 +500,6 @@ class TestBuildConfigFromArgs:
 
     def test_builds_config_with_max_retries(self) -> None:
         """Test that config is built with max_retries."""
-        from test.unit.conftest import BASE_CLI_ARGS
         parser = create_parser()
         args = parser.parse_args(BASE_CLI_ARGS + ["--max-retries", "5"])
         config = build_config_from_args(args)
