@@ -476,81 +476,41 @@ class TestParseTags:
 class TestBuildConfigFromArgs:
     """Tests for build_config_from_args function."""
 
-    def test_builds_config_with_required_fields(self) -> None:
+    def test_builds_config_with_required_fields(
+        self, base_cli_args: argparse.Namespace
+    ) -> None:
         """Test that config is built with required fields."""
-        parser = create_parser()
-        args = parser.parse_args([
-            "--ami-name", "my-ami",
-            "--region", "us-east-1",
-            "--source-ami", "ami-12345",
-            "--subnet-ids", "subnet-1",
-            "--instance-types", "t3.micro",
-            "--security-group-id", "sg-12345",
-            "--setup-file", "setup.sh",
-        ])
-        config = build_config_from_args(args)
+        config = build_config_from_args(base_cli_args)
         assert config.ami.name == "my-ami"
 
-    def test_builds_config_with_security_group(self) -> None:
+    def test_builds_config_with_security_group(
+        self, base_cli_args: argparse.Namespace
+    ) -> None:
         """Test that config is built with security_group_id."""
-        parser = create_parser()
-        args = parser.parse_args([
-            "--ami-name", "my-ami",
-            "--region", "us-east-1",
-            "--source-ami", "ami-12345",
-            "--subnet-ids", "subnet-1",
-            "--instance-types", "t3.micro",
-            "--security-group-id", "sg-12345",
-            "--setup-file", "setup.sh",
-        ])
-        config = build_config_from_args(args)
+        config = build_config_from_args(base_cli_args)
         assert config.instance.security_group_id == "sg-12345"
 
     def test_builds_config_with_purchase_type(self) -> None:
         """Test that config is built with purchase_type."""
+        from test.unit.conftest import BASE_CLI_ARGS
         parser = create_parser()
-        args = parser.parse_args([
-            "--ami-name", "my-ami",
-            "--region", "us-east-1",
-            "--source-ami", "ami-12345",
-            "--subnet-ids", "subnet-1",
-            "--instance-types", "t3.micro",
-            "--security-group-id", "sg-12345",
-            "--purchase-type", "spot",
-            "--setup-file", "setup.sh",
-        ])
+        args = parser.parse_args(BASE_CLI_ARGS + ["--purchase-type", "spot"])
         config = build_config_from_args(args)
         assert config.instance.purchase_type == "spot"
 
     def test_builds_config_with_max_retries(self) -> None:
         """Test that config is built with max_retries."""
+        from test.unit.conftest import BASE_CLI_ARGS
         parser = create_parser()
-        args = parser.parse_args([
-            "--ami-name", "my-ami",
-            "--region", "us-east-1",
-            "--source-ami", "ami-12345",
-            "--subnet-ids", "subnet-1",
-            "--instance-types", "t3.micro",
-            "--security-group-id", "sg-12345",
-            "--max-retries", "5",
-            "--setup-file", "setup.sh",
-        ])
+        args = parser.parse_args(BASE_CLI_ARGS + ["--max-retries", "5"])
         config = build_config_from_args(args)
         assert config.instance.max_retries == 5
 
-    def test_builds_config_with_default_purchase_type(self) -> None:
+    def test_builds_config_with_default_purchase_type(
+        self, base_cli_args: argparse.Namespace
+    ) -> None:
         """Test that config defaults to on-demand."""
-        parser = create_parser()
-        args = parser.parse_args([
-            "--ami-name", "my-ami",
-            "--region", "us-east-1",
-            "--source-ami", "ami-12345",
-            "--subnet-ids", "subnet-1",
-            "--instance-types", "t3.micro",
-            "--security-group-id", "sg-12345",
-            "--setup-file", "setup.sh",
-        ])
-        config = build_config_from_args(args)
+        config = build_config_from_args(base_cli_args)
         assert config.instance.purchase_type == "on-demand"
 
     def test_splits_comma_separated_subnet_ids(self) -> None:

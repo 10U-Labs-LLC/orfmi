@@ -1,13 +1,34 @@
 """Unit test configuration."""
 
+import argparse
 from pathlib import Path
 from typing import Any, Generator
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from orfmi.cli import create_parser
 from orfmi.ec2 import create_ami
 from orfmi.ssh import SshConfig, run_setup_script
+
+
+# Base CLI args shared by multiple tests
+BASE_CLI_ARGS = [
+    "--ami-name", "my-ami",
+    "--region", "us-east-1",
+    "--source-ami", "ami-12345",
+    "--subnet-ids", "subnet-1",
+    "--instance-types", "t3.micro",
+    "--security-group-id", "sg-12345",
+    "--setup-file", "setup.sh",
+]
+
+
+@pytest.fixture
+def base_cli_args() -> argparse.Namespace:
+    """Parse base CLI arguments for config building tests."""
+    parser = create_parser()
+    return parser.parse_args(BASE_CLI_ARGS)
 
 
 @pytest.fixture
